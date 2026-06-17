@@ -1,0 +1,6 @@
+from sekoia_automation.module import Module
+from sekoia_valhalla_integration_modules.models import SekoiaValhallaIntegrationModuleConfiguration
+
+
+class SekoiaValhallaIntegrationModule(Module):
+    configuration: SekoiaValhallaIntegrationModuleConfiguration
