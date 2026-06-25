@@ -93,7 +93,7 @@ class MockSekoia(BaseHTTPRequestHandler):
         if not self.path.startswith(prefix):
             self._reply(404, {"message": "Not found"})
             return
-        sekoia_uuid = self.path[len(prefix):]
+        sekoia_uuid = self.path[len(prefix) :]
         body = self._read_json()
         if body is None:
             return

@@ -38,13 +38,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test suite (33 tests) covering the Valhalla client, Sekoia client, the STIX
   converter, the Sigma mapper, and both triggers end-to-end with mocked
   destinations.
-
-### Note
-To use the Rules Catalog trigger, supply:
-- a Sekoia API key (Settings → Workspace → API Keys) as the
-  `sekoia_api_key` module configuration value, and
-- an `alert_type_uuid` per-trigger argument (fetch one via
-  `GET /v1/sic/conf/alerts/types`).
-
-For regions other than FRA1, also override `sekoia_base_url` —
-FRA2/MCO1/UAE1 use `https://app.<region>.sekoia.io/api`.

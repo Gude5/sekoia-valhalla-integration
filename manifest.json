@@ -34,7 +34,7 @@
   "description": "Integration of Valhalla into Sekoia",
   "name": "Sekoia Valhalla Integration",
   "slug": "sekoia-valhalla-integration",
-  "categories": [],
+  "categories": ["Threat Intelligence"],
   "uuid": "ee90bd76-6805-4298-a25d-c8950f0209ec",
   "version": "0.1.0"
 }

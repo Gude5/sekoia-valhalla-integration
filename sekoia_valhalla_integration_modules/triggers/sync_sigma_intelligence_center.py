@@ -43,9 +43,7 @@ class SyncSigmaIntelligenceCenter(Trigger):
 
     def _rule_key(self, rule: dict) -> str:
         return (
-            rule.get("id")
-            or rule.get("filename")
-            or json.dumps(rule, sort_keys=True)
+            rule.get("id") or rule.get("filename") or json.dumps(rule, sort_keys=True)
         )
 
     def _emit_bundle(self, rules: list[dict]):

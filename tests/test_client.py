@@ -16,7 +16,9 @@ def test_get_sigma_feed_posts_form_encoded_apikey():
 
         assert len(m.request_history) == 1
         req = m.request_history[0]
-        assert req.headers["Content-Type"].startswith("application/x-www-form-urlencoded")
+        assert req.headers["Content-Type"].startswith(
+            "application/x-www-form-urlencoded"
+        )
         assert "apikey=deadbeef" in req.text
         assert "format=json" in req.text
 

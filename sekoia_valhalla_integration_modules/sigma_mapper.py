@@ -20,12 +20,7 @@ def sigma_rule_to_catalog_payload(
     except yaml.YAMLError:
         parsed = {}
 
-    title = (
-        parsed.get("title")
-        or rule.get("name")
-        or rule.get("filename")
-        or "unnamed"
-    )
+    title = parsed.get("title") or rule.get("name") or rule.get("filename") or "unnamed"
     description = parsed.get("description") or rule.get("description") or ""
     level = (parsed.get("level") or rule.get("level") or "").lower()
     severity = SEVERITY_MAP.get(level, DEFAULT_SEVERITY)

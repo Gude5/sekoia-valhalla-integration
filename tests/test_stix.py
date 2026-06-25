@@ -3,7 +3,6 @@ from sekoia_valhalla_integration_modules.stix import (
     sigma_rule_to_indicator,
 )
 
-
 SAMPLE_RULE = {
     "signature_type": "sigma",
     "type": "process_creation",

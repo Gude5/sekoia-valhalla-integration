@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel, Field
 
 DEMO_API_KEY = "1" * 64

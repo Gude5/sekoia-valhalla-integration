@@ -31,7 +31,10 @@ def test_create_rule_strips_trailing_slash_from_base_url():
             json={"uuid": "u"},
         )
         client.create_rule({})
-        assert m.last_request.url == "https://api.sekoia.io/v1/sic/conf/rules-catalog/rules"
+        assert (
+            m.last_request.url
+            == "https://api.sekoia.io/v1/sic/conf/rules-catalog/rules"
+        )
 
 
 def test_update_rule_puts_with_uuid_in_path():

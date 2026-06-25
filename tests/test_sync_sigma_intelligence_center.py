@@ -9,7 +9,6 @@ from sekoia_valhalla_integration_modules.triggers.sync_sigma_intelligence_center
     SyncSigmaIntelligenceCenter,
 )
 
-
 SAMPLE_RULES = [
     {"id": "id-a", "filename": "rule_a.yml", "content": "title: A"},
     {"id": "id-b", "filename": "rule_b.yml", "content": "title: B"},

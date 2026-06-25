@@ -4,7 +4,6 @@ from sekoia_valhalla_integration_modules.sigma_mapper import (
     sigma_rule_to_catalog_payload,
 )
 
-
 HIGH_RULE_YAML = """\
 title: Suspicious process creation
 description: Detects a suspicious process being spawned.

@@ -9,7 +9,6 @@ from sekoia_valhalla_integration_modules.triggers.sync_sigma_rules_catalog impor
     SyncSigmaRulesCatalog,
 )
 
-
 SAMPLE_RULES = [
     {"id": "valhalla-a", "filename": "a.yml", "content": "title: A\nlevel: medium\n"},
     {"id": "valhalla-b", "filename": "b.yml", "content": "title: B\nlevel: high\n"},
