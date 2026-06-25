@@ -1,0 +1,16 @@
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.coverage
+htmlcov
+.git
+.gitignore
+.idea
+.vscode
+tests/
+scripts/
+TESTING_LAYER4.md
+testing-e2e.md

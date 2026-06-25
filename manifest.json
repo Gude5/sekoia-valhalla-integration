@@ -3,8 +3,33 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Sekoia Valhalla Integration",
     "type": "object",
-    "properties": {},
-    "required": []
+    "properties": {
+      "api_key": {
+        "type": "string",
+        "title": "Valhalla API key",
+        "description": "API key from valhalla.nextron-systems.com. The default is the public demo key, which only grants the community feed.",
+        "default": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "base_url": {
+        "type": "string",
+        "title": "Valhalla base URL",
+        "description": "Override the Valhalla API base URL.",
+        "default": "https://valhalla.nextron-systems.com"
+      },
+      "sekoia_api_key": {
+        "type": "string",
+        "title": "Sekoia API key",
+        "description": "Bearer token from Sekoia (Settings → Workspace → API Keys). Required only for the Rules Catalog trigger."
+      },
+      "sekoia_base_url": {
+        "type": "string",
+        "title": "Sekoia API base URL",
+        "description": "Region-specific base URL. Default https://api.sekoia.io covers FRA1. For FRA2/MCO1/UAE1 use https://app.<region>.sekoia.io/api.",
+        "default": "https://api.sekoia.io"
+      }
+    },
+    "required": [],
+    "secrets": ["api_key", "sekoia_api_key"]
   },
   "description": "Integration of Valhalla into Sekoia",
   "name": "Sekoia Valhalla Integration",

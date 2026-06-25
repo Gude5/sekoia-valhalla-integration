@@ -1,0 +1,36 @@
+{
+  "uuid": "e6befd0a-3c7f-43e6-844f-efebc5c0b0a0",
+  "name": "Sync Valhalla Sigma rules into Sekoia Rules Catalog",
+  "description": "Periodically pulls the Valhalla Sigma feed and POSTs each rule to the Sekoia Rules Catalog so it executes in the detection engine. POST on first seen, PUT on subsequent pulls.",
+  "docker_parameters": "sync-sigma-rules-catalog",
+  "arguments": {
+    "type": "object",
+    "properties": {
+      "frequency": {
+        "type": "integer",
+        "title": "Pull frequency in seconds",
+        "default": 86400,
+        "minimum": 3600
+      },
+      "alert_type_uuid": {
+        "type": "string",
+        "title": "Alert type UUID",
+        "description": "Sekoia alert taxonomy UUID. Fetch from GET /v1/sic/conf/alerts/types."
+      },
+      "enabled": {
+        "type": "boolean",
+        "title": "Enable rules on push",
+        "description": "When false (default), rules land in the catalog disabled — users opt in per rule.",
+        "default": false
+      }
+    },
+    "required": ["alert_type_uuid"]
+  },
+  "results": {
+    "type": "object",
+    "properties": {
+      "created": { "type": "integer" },
+      "updated": { "type": "integer" }
+    }
+  }
+}
