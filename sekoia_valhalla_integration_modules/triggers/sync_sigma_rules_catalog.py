@@ -31,6 +31,8 @@ class SyncSigmaRulesCatalog(Trigger):
             rules = self._valhalla.get_sigma_feed()
             created = 0
             updated = 0
+            failed = 0
+            first_failure_logged = False
             with PersistentJSON(UUID_MAP_FILE, self.data_path) as id_map:
                 for rule in rules:
                     valhalla_id = rule.get("id")
@@ -48,18 +50,27 @@ class SyncSigmaRulesCatalog(Trigger):
                             id_map[valhalla_id] = sekoia_uuid
                             created += 1
                     except Exception as exc:
-                        self.log_exception(
-                            exc,
-                            message=f"Failed to sync rule {valhalla_id}",
-                        )
+                        failed += 1
+                        # Log the first failure loudly with the full POST body
+                        # so the user can see exactly what shape the API rejected.
+                        if not first_failure_logged:
+                            self.log(
+                                f"First rule sync failure (subsequent failures "
+                                f"counted but not individually logged). "
+                                f"Rule id={valhalla_id}, name={body.get('name')!r}. "
+                                f"Sent body: {body}. Error: {exc}",
+                                level="error",
+                            )
+                            first_failure_logged = True
 
             self.log(
-                f"Catalog sync: created={created} updated={updated}",
+                f"Catalog sync: created={created} updated={updated} failed={failed} "
+                f"total_rules={len(rules)}",
                 level="info",
             )
             self.send_event(
                 event_name="valhalla-sigma-catalog-sync",
-                event={"created": created, "updated": updated},
+                event={"created": created, "updated": updated, "failed": failed},
             )
         except Exception as exc:
             self.log_exception(
