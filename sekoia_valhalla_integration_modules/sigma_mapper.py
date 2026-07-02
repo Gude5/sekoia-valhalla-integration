@@ -30,6 +30,8 @@ RAW_TO_ECS: dict[str, str] = {
     "User": "user.name",
     "SourceImage": "process.executable",
     "TargetImage": "process.executable",
+    # Users
+    "TargetUserName": "user.target.name",
     # Event metadata
     "EventID": "event.code",
     "Provider_Name": "winlog.provider_name",
@@ -39,6 +41,10 @@ RAW_TO_ECS: dict[str, str] = {
     "ImageLoaded": "dll.path",
     "ImagePath": "process.executable",
     "PipeName": "file.name",
+    # PE metadata (Sysmon image_load)
+    "Description": "file.pe.description",
+    "Product": "file.pe.product",
+    "Company": "file.pe.company",
     # PowerShell
     "ScriptBlockText": "powershell.file.script_block_text",
     # Network / DNS
@@ -48,6 +54,15 @@ RAW_TO_ECS: dict[str, str] = {
     "SourceIp": "source.ip",
     "IpAddress": "source.ip",
     "QueryName": "dns.question.name",
+    "Initiated": "network.direction",
+    # Web / proxy — W3C ELF fields used by IIS + proxy logs
+    "cs-method": "http.request.method",
+    "cs-referer": "http.request.referrer",
+    "cs-uri-query": "url.query",
+    "cs-uri-stem": "url.path",
+    "cs-uri": "url.original",
+    "sc-status": "http.response.status_code",
+    "userAgent": "user_agent.original",
     # Services
     "ServiceName": "service.name",
     "ServiceFileName": "service.executable",
@@ -57,8 +72,10 @@ RAW_TO_ECS: dict[str, str] = {
     "SignatureStatus": "code_signature.status",
 }
 
-# Field key like "CommandLine" or "CommandLine|contains|base64offset".
-_FIELD_KEY_RE = re.compile(r"^([A-Za-z0-9_.]+)((?:\|[a-z0-9_]+)*)$")
+# Field key like "CommandLine" or "cs-uri-query|contains|base64offset".
+# Field names allow letters, digits, underscore, dot, and hyphen (for W3C ELF
+# style names such as `cs-method`).
+_FIELD_KEY_RE = re.compile(r"^([A-Za-z0-9_.\-]+)((?:\|[a-z0-9_]+)*)$")
 
 # Keys under `detection:` that are not selection blocks and must not be walked.
 _NON_SELECTION_KEYS = frozenset({"condition", "timeframe"})

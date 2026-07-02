@@ -51,6 +51,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `failed`, `skipped_unmapped`, `total_rules`, and `top_unmapped` — the last
   a map of `{field_name: count}` for the 20 most-common unmapped fields.
   Operators can use it to prioritise the next fields to add to the map.
-- Test suite (65 tests) covering the Valhalla client, Sekoia client, the STIX
+- Extended the ECS field mapping with 12 more Sigma → ECS entries, informed
+  by a category-acceptance probe against a live Sekoia tenant: PE metadata
+  (`Description` → `file.pe.description`, `Product`, `Company`), Sysmon
+  network direction (`Initiated`), Windows security target user
+  (`TargetUserName`), and W3C-ELF web/proxy fields (`cs-method`, `cs-referer`,
+  `cs-uri-query`, `cs-uri-stem`, `cs-uri`, `sc-status`, `userAgent`).
+- Field-name parser now accepts hyphens (needed for W3C-ELF `cs-*` /
+  `sc-*` fields when combined with Sigma modifiers such as `|contains`).
+- Test suite (79 tests) covering the Valhalla client, Sekoia client, the STIX
   converter, the Sigma mapper (including the new ECS converter), and both
   triggers end-to-end with mocked destinations.
