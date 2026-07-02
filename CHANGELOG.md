@@ -35,6 +35,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default; configurable. Per-rule errors are logged and the sync continues.
 - Both triggers run on a configurable interval (`frequency`, default 24h)
   via APScheduler `BlockingScheduler`.
-- Test suite (33 tests) covering the Valhalla client, Sekoia client, the STIX
-  converter, the Sigma mapper, and both triggers end-to-end with mocked
-  destinations.
+- Sigma-to-ECS field-name converter (`convert_payload_to_ecs`) for the Rules
+  Catalog trigger. Rewrites the `detection:` block of each rule from raw
+  SigmaHQ field names (`CommandLine`, `Image`, `EventID`, `TargetFilename`,
+  `ScriptBlockText`, `DestinationIp`, …) to their Elastic Common Schema
+  equivalents (`process.command_line`, `process.executable`, `event.code`,
+  `file.path`, `powershell.file.script_block_text`, `destination.ip`, …)
+  before POSTing. Sigma field modifiers (`|contains`, `|endswith`, `|re`,
+  `|base64offset`, chained combinations) are preserved. Rules that reference
+  any field not in the current 30-entry mapping are skipped and their
+  unmapped field names are aggregated into a `top_unmapped` telemetry
+  histogram on the sync summary event. Measured yield against the Valhalla
+  demo feed: ~62% of the ~3,591 rules convert successfully.
+- Rules-Catalog sync summary event now carries `created`, `updated`,
+  `failed`, `skipped_unmapped`, `total_rules`, and `top_unmapped` — the last
+  a map of `{field_name: count}` for the 20 most-common unmapped fields.
+  Operators can use it to prioritise the next fields to add to the map.
+- Test suite (65 tests) covering the Valhalla client, Sekoia client, the STIX
+  converter, the Sigma mapper (including the new ECS converter), and both
+  triggers end-to-end with mocked destinations.

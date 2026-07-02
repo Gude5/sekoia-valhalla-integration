@@ -1,3 +1,5 @@
+from collections import Counter
+
 from apscheduler.schedulers.blocking import BlockingScheduler
 from sekoia_automation.storage import PersistentJSON
 from sekoia_automation.trigger import Trigger
@@ -5,10 +7,12 @@ from sekoia_automation.trigger import Trigger
 from sekoia_valhalla_integration_modules.client import ValhallaClient
 from sekoia_valhalla_integration_modules.sekoia_client import SekoiaClient
 from sekoia_valhalla_integration_modules.sigma_mapper import (
+    convert_payload_to_ecs,
     sigma_rule_to_catalog_payload,
 )
 
 UUID_MAP_FILE = "valhalla-sigma-catalog-uuid-map.json"
+TOP_UNMAPPED_REPORT = 20
 
 
 class SyncSigmaRulesCatalog(Trigger):
@@ -32,14 +36,28 @@ class SyncSigmaRulesCatalog(Trigger):
             created = 0
             updated = 0
             failed = 0
+            skipped_unmapped = 0
+            unmapped_field_counter: Counter[str] = Counter()
             first_failure_logged = False
             with PersistentJSON(UUID_MAP_FILE, self.data_path) as id_map:
                 for rule in rules:
                     valhalla_id = rule.get("id")
                     if not valhalla_id:
                         continue
+
+                    converted_yaml, unmapped = convert_payload_to_ecs(
+                        rule.get("content", "")
+                    )
+                    if converted_yaml is None:
+                        skipped_unmapped += 1
+                        for f in unmapped:
+                            unmapped_field_counter[f] += 1
+                        continue
+
                     body = sigma_rule_to_catalog_payload(
-                        rule, self._alert_type_uuid, self._enabled
+                        {**rule, "content": converted_yaml},
+                        self._alert_type_uuid,
+                        self._enabled,
                     )
                     try:
                         if valhalla_id in id_map:
@@ -63,14 +81,23 @@ class SyncSigmaRulesCatalog(Trigger):
                             )
                             first_failure_logged = True
 
+            top_unmapped = dict(unmapped_field_counter.most_common(TOP_UNMAPPED_REPORT))
             self.log(
-                f"Catalog sync: created={created} updated={updated} failed={failed} "
-                f"total_rules={len(rules)}",
+                f"Catalog sync: created={created} updated={updated} "
+                f"failed={failed} skipped_unmapped={skipped_unmapped} "
+                f"total_rules={len(rules)} top_unmapped={top_unmapped}",
                 level="info",
             )
             self.send_event(
                 event_name="valhalla-sigma-catalog-sync",
-                event={"created": created, "updated": updated, "failed": failed},
+                event={
+                    "created": created,
+                    "updated": updated,
+                    "failed": failed,
+                    "skipped_unmapped": skipped_unmapped,
+                    "total_rules": len(rules),
+                    "top_unmapped": top_unmapped,
+                },
             )
         except Exception as exc:
             self.log_exception(
