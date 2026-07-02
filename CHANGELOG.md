@@ -59,6 +59,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `cs-uri-query`, `cs-uri-stem`, `cs-uri`, `sc-status`, `userAgent`).
 - Field-name parser now accepts hyphens (needed for W3C-ELF `cs-*` /
   `sc-*` fields when combined with Sigma modifiers such as `|contains`).
-- Test suite (79 tests) covering the Valhalla client, Sekoia client, the STIX
-  converter, the Sigma mapper (including the new ECS converter), and both
-  triggers end-to-end with mocked destinations.
+- Stage 2 converter additions:
+  - **Context-aware `TargetObject`** — resolves to `registry.path` for
+    Sigma rules with `logsource.category` in
+    `registry_set`/`registry_add`/`registry_delete`/`registry_rename`/`registry_event`,
+    and to `file.path` for `file_event`. Rules with unrecognised logsource
+    contexts remain skipped.
+  - **`Hashes` value split** — Sigma's `Hashes|contains: 'MD5=abc,SHA256=def'`
+    (string or list form) is rewritten into individual
+    `process.hash.md5`, `process.hash.sha1`, `process.hash.sha256`,
+    `process.hash.sha512`, `process.hash.imphash` keys. Multi-value lists of
+    a single algorithm are preserved as lists (OR-semantics intact);
+    mixed-algo lists become AND-matched sibling keys (documented approximation).
+    Unknown algorithms or malformed values cause the rule to be skipped.
+- Added 24 more ECS field mappings, empirically confirmed by a
+  candidate-mapping probe against a live Sekoia tenant:
+  - AWS CloudTrail / Azure activity logs: `eventName` → `event.action`,
+    `eventSource` → `event.provider`, `operationName` → `event.action`,
+    `errorCode` → `aws.cloudtrail.error_code`, `properties.message` →
+    `azure.activitylogs.properties.message`, `status` → `event.outcome`,
+    `riskEventType` → `azure.signinlogs.properties.risk_event_type`.
+  - Linux auditd: `SYSCALL`, `type`, `a0`, `a1`, `exe`, `cfgpath` → their
+    `auditd.data.*` / `auditd.log.record_type` counterparts (`exe` collapses
+    onto `process.executable`).
+  - Windows Security event_data: `ObjectClass`, `ObjectDN`, `Details`,
+    `LogonType`, `GrantedAccess`, `CallTrace`, `InterfaceUuid` land under
+    the `winlog.event_data.*` namespace; `SubjectUserName` → `user.name`.
+  - Web / proxy client-side (W3C ELF): `c-uri` → `url.original`,
+    `c-useragent` → `user_agent.original`. DNS: `query` → `dns.question.name`.
+- Known limitation: `type` and `status` are very generic Sigma field names.
+  Rules that use them outside their expected context (auditd for `type`,
+  Azure for `status`) will convert to a technically-valid ECS name that may
+  not match intended events. Override on a per-tenant basis via
+  `custom_field_mapping` (planned feature) if hit in practice.
+- Test suite (119 tests) covering the Valhalla client, Sekoia client, the
+  STIX converter, the Sigma mapper (including the new ECS converter and
+  Stage 2 extensions), and both triggers end-to-end with mocked destinations.
