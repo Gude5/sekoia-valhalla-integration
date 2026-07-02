@@ -92,6 +92,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Azure for `status`) will convert to a technically-valid ECS name that may
   not match intended events. Override on a per-tenant basis via
   `custom_field_mapping` (planned feature) if hit in practice.
-- Test suite (119 tests) covering the Valhalla client, Sekoia client, the
+- Truncate rule `name` to Sekoia's 100-character API limit before POSTing.
+  Rules whose Sigma title exceeds 100 characters (e.g.
+  `CVE-2023-1389 Potential Exploitation Attempt - Unauthenticated Command
+  Injection In TP-Link Archer AX21`) were previously rejected with
+  `HTTP 400 VA301`; they are now truncated with a `…` suffix so operators
+  can still recognise the source rule.
+- Test suite (122 tests) covering the Valhalla client, Sekoia client, the
   STIX converter, the Sigma mapper (including the new ECS converter and
   Stage 2 extensions), and both triggers end-to-end with mocked destinations.

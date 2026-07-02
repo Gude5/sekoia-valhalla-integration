@@ -13,6 +13,12 @@ SEVERITY_MAP = {
 DEFAULT_SEVERITY = 40
 DEFAULT_EFFORT = 2
 
+# Sekoia Rules Catalog API rejects (HTTP 400 VA301) rule names longer than
+# 100 characters. Truncate defensively and mark truncation with a single-char
+# Unicode ellipsis so operators can still recognise the rule.
+MAX_NAME_LENGTH = 100
+_TRUNCATION_MARKER = "…"
+
 # Tier 1: clean 1:1 mappings from raw SigmaHQ field names to Elastic Common
 # Schema. Covers the ~34 most-frequent Windows/network/web fields in the
 # Valhalla feed. Extended in Stage 2 with context-aware branches for
@@ -361,6 +367,8 @@ def sigma_rule_to_catalog_payload(
         parsed = {}
 
     title = parsed.get("title") or rule.get("name") or rule.get("filename") or "unnamed"
+    if len(title) > MAX_NAME_LENGTH:
+        title = title[: MAX_NAME_LENGTH - len(_TRUNCATION_MARKER)] + _TRUNCATION_MARKER
     description = parsed.get("description") or rule.get("description") or ""
     level = (parsed.get("level") or rule.get("level") or "").lower()
     severity = SEVERITY_MAP.get(level, DEFAULT_SEVERITY)
