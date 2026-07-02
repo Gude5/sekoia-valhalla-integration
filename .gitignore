@@ -218,3 +218,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---------------------------------------------------------------------------
+# Dev-only artefacts — NOT shipped to Sekoia. These live only in the local
+# workspace; the git repo carries only what Sekoia's importer needs to build
+# the module. Reintroduce individual paths if you want them in the pushed
+# repo.
+# ---------------------------------------------------------------------------
+tests/
+scripts/
+e2e-subplans/
+uv.lock
