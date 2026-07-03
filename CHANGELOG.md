@@ -57,7 +57,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dicts of `{id, type}`; only the UUID `id` is forwarded. Rules whose
   `related` entries have no `id` no longer ship the field.
 
-### Added
 - Module-level configuration: `api_key` (Valhalla, defaults to the public demo
   key), `base_url` (Valhalla, defaults to https://valhalla.nextron-systems.com),
   `sekoia_api_key` (Sekoia bearer token), `sekoia_base_url` (Sekoia API,
