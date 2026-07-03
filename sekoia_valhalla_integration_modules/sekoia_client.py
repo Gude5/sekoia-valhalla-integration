@@ -48,3 +48,12 @@ class SekoiaClient:
         url = f"{self._base_url}/v1/sic/conf/rules-catalog/rules/{sekoia_uuid}"
         resp = requests.put(url, json=body, headers=self._headers(), timeout=self._timeout)
         self._ensure_ok(resp, "PUT", url)
+
+    def delete_rule(self, sekoia_uuid: str) -> None:
+        """DELETE a rule by uuid. 404 is treated as idempotent success (the
+        rule was already gone in Sekoia)."""
+        url = f"{self._base_url}/v1/sic/conf/rules-catalog/rules/{sekoia_uuid}"
+        resp = requests.delete(url, headers=self._headers(), timeout=self._timeout)
+        if resp.status_code == 404:
+            return
+        self._ensure_ok(resp, "DELETE", url)

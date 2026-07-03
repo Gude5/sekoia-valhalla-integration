@@ -98,6 +98,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Injection In TP-Link Archer AX21`) were previously rejected with
   `HTTP 400 VA301`; they are now truncated with a `…` suffix so operators
   can still recognise the source rule.
-- Test suite (122 tests) covering the Valhalla client, Sekoia client, the
-  STIX converter, the Sigma mapper (including the new ECS converter and
-  Stage 2 extensions), and both triggers end-to-end with mocked destinations.
+- New Action **`delete-catalog-rules`** — on-demand cleanup that deletes
+  every rule the `sync-sigma-rules-catalog` trigger created in the tenant,
+  identified via the persisted `valhalla_id → sekoia_uuid` map. Never touches
+  user-created custom rules or Sekoia's verified catalog. Defaults to
+  dry-run: `confirm=false` returns a report of what WOULD be deleted; set
+  `confirm=true` in the playbook arguments to actually delete. Successful
+  deletes are removed from the local state map, so the next sync run
+  POSTs (rather than PUTs) every rule. Sekoia returning 404 on a DELETE is
+  treated as idempotent success.
+- SekoiaClient gained a `delete_rule(sekoia_uuid)` method wrapping
+  `DELETE /v1/sic/conf/rules-catalog/rules/<uuid>`.
+- Test suite covers the Valhalla client, Sekoia client (including the new
+  delete method), the STIX converter, the Sigma mapper (ECS converter +
+  Stage 2 extensions), both triggers, and the new delete action end-to-end
+  with mocked destinations.

@@ -1,5 +1,8 @@
 from sekoia_automation.module import Module
 
+from sekoia_valhalla_integration_modules.actions.delete_catalog_rules import (
+    DeleteCatalogRules,
+)
 from sekoia_valhalla_integration_modules.models import (
     SekoiaValhallaIntegrationModuleConfiguration,
 )
@@ -16,6 +19,7 @@ class SekoiaValhallaIntegrationModule(Module):
 
 
 __all__ = [
+    "DeleteCatalogRules",
     "SekoiaValhallaIntegrationModule",
     "SyncSigmaIntelligenceCenter",
     "SyncSigmaRulesCatalog",
