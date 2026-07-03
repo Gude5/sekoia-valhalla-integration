@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Fixed
+- `datasources` field is now shipped as a list (`[{...}]`) instead of a
+  bare dict, matching Sekoia's Rules Catalog schema. Previously every rule
+  with a `logsource:` block was rejected with
+  `HTTP 400 VA301 — Input should be a valid list` at the `datasources`
+  path. Sigma's `logsource` is a single dict, so it is wrapped in a
+  one-element list before POSTing.
+
 ### Added
 - Module-level configuration: `api_key` (Valhalla, defaults to the public demo
   key), `base_url` (Valhalla, defaults to https://valhalla.nextron-systems.com),

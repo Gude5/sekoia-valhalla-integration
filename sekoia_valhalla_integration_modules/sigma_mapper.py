@@ -429,7 +429,8 @@ def sigma_rule_to_catalog_payload(
 
     logsource = parsed.get("logsource")
     if logsource:
-        body["datasources"] = logsource
+        # Sekoia's `datasources` is a list; Sigma's `logsource` is a single dict.
+        body["datasources"] = logsource if isinstance(logsource, list) else [logsource]
 
     related = parsed.get("related")
     if related:
