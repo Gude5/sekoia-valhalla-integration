@@ -8,12 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Fixed
-- `datasources` field is now shipped as a list (`[{...}]`) instead of a
-  bare dict, matching Sekoia's Rules Catalog schema. Previously every rule
-  with a `logsource:` block was rejected with
-  `HTTP 400 VA301 — Input should be a valid list` at the `datasources`
-  path. Sigma's `logsource` is a single dict, so it is wrapped in a
-  one-element list before POSTing.
+- `datasources` is no longer sent in the Rules Catalog POST body. Sekoia's
+  schema expects a list of tenant-registered data-source **UUIDs**, not
+  the free-form Sigma `logsource` dict. Previously every rule with a
+  `logsource:` block was rejected with
+  `HTTP 400 VA301 — UUID input should be a string, bytes or UUID object`
+  at `datasources[0]`. The Sigma logsource metadata remains visible in
+  the payload YAML if needed downstream; mapping to Sekoia data-source
+  UUIDs would require a tenant-specific lookup we can't derive from Sigma.
+- `related_object_refs` is now shipped as a list of UUID strings
+  (extracted from each Sigma `related` entry's `id` field), matching
+  Sekoia's expected list-of-UUIDs shape. Sigma's `related` entries are
+  dicts of `{id, type}`; only the UUID `id` is forwarded. Rules whose
+  `related` entries have no `id` no longer ship the field.
 
 ### Added
 - Module-level configuration: `api_key` (Valhalla, defaults to the public demo

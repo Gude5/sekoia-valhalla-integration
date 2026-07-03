@@ -379,14 +379,17 @@ def sigma_rule_to_catalog_payload(
 ) -> dict:
     """Build the Sekoia Rules Catalog POST body.
 
-    Metadata (name, description, severity, effort, tags, datasources, ...)
-    is lifted from the parsed Sigma rule dict into structured Sekoia fields.
-    The ``payload`` is only the ECS-converted ``detection:`` block,
+    Metadata (name, description, severity, effort, tags, ...) is lifted
+    from the parsed Sigma rule dict into structured Sekoia fields. The
+    ``payload`` is only the ECS-converted ``detection:`` block,
     YAML-serialised with the ``detection:`` keyword preserved.
 
-    Optional Sekoia fields (``community_uuid``, ``tags``, ``datasources``,
+    Optional Sekoia fields (``community_uuid``, ``tags``,
     ``related_object_refs``, ``false_positives``) are included only when
-    the source Sigma rule actually carries the corresponding data.
+    the source Sigma rule actually carries the corresponding data. Sekoia's
+    ``datasources`` is a list of tenant-registered data-source UUIDs and
+    is intentionally omitted (Sigma's ``logsource`` dict can't be mapped
+    to a tenant UUID without extra context).
     """
     title = parsed.get("title") or rule.get("name") or rule.get("filename") or "unnamed"
     if len(title) > MAX_NAME_LENGTH:
@@ -427,14 +430,24 @@ def sigma_rule_to_catalog_payload(
     if tags:
         body["tags"] = tags
 
-    logsource = parsed.get("logsource")
-    if logsource:
-        # Sekoia's `datasources` is a list; Sigma's `logsource` is a single dict.
-        body["datasources"] = logsource if isinstance(logsource, list) else [logsource]
+    # Sekoia's `datasources` is a list of registered data-source UUIDs in the
+    # tenant, not the free-form Sigma `logsource` dict — we have no reliable
+    # mapping from `{product, category}` to a tenant-specific UUID, so this
+    # field is omitted. The Sigma logsource stays visible via the payload
+    # YAML if needed downstream.
 
+    # `related_object_refs` is a list of Sekoia UUIDs. Sigma's `related`
+    # entries carry a UUID under `id` (plus a `type` string). Extract just
+    # the UUIDs.
     related = parsed.get("related")
-    if related:
-        body["related_object_refs"] = related
+    if related and isinstance(related, list):
+        related_ids = [
+            item["id"]
+            for item in related
+            if isinstance(item, dict) and item.get("id")
+        ]
+        if related_ids:
+            body["related_object_refs"] = related_ids
 
     falsepositives = parsed.get("falsepositives")
     if falsepositives:
