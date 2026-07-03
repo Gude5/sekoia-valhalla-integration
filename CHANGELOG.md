@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Changed
+- `delete-catalog-rules` trigger no longer depends on a local id-map (which
+  isn't visible across Sekoia's per-trigger persistent volumes). It now
+  enumerates the Sekoia Rules Catalog via
+  `GET /v1/sic/conf/rules-catalog/rules` and deletes every rule whose
+  top-level `author` field matches a configurable marker
+  (default `valhalla-integration` — Sekoia stamps this on every rule the
+  sync trigger's API key creates). Handles pagination. Server-side filter
+  is passed as `match[author]=<value>`; a client-side filter is applied
+  as a safety net so we never delete a rule whose `author` doesn't match.
+  New optional trigger config: `author` (defaults to `valhalla-integration`).
+  Summary event now includes `total_matched` (instead of `total_known`)
+  and the matched `author` value.
+- SekoiaClient gained `iter_rules(match_author=..., page_size=100)` — a
+  paginated generator over the Rules Catalog list endpoint.
+
 - **Breaking**: `delete-catalog-rules` is now a **Trigger**, not an Action.
   Playbooks that invoked the action step must be replaced by enabling the
   new trigger with `confirm=true` in its configuration. Runs the cleanup

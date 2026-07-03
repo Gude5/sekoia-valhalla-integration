@@ -1,8 +1,13 @@
+from typing import Iterator, Optional
+
 import requests
 
 
 class SekoiaAPIError(RuntimeError):
     """Raised when the Sekoia API returns a non-2xx response or an unexpected body."""
+
+
+LIST_PAGE_SIZE = 100
 
 
 class SekoiaClient:
@@ -57,3 +62,46 @@ class SekoiaClient:
         if resp.status_code == 404:
             return
         self._ensure_ok(resp, "DELETE", url)
+
+    def iter_rules(
+        self,
+        match_author: Optional[str] = None,
+        page_size: int = LIST_PAGE_SIZE,
+    ) -> Iterator[dict]:
+        """Paginate ``GET /v1/sic/conf/rules-catalog/rules`` and yield
+        each rule dict. When ``match_author`` is set, only rules whose
+        top-level ``author`` field equals that string are yielded.
+        """
+        url = f"{self._base_url}/v1/sic/conf/rules-catalog/rules"
+        offset = 0
+        while True:
+            params: dict[str, object] = {"limit": page_size, "offset": offset}
+            if match_author:
+                params["match[author]"] = match_author
+            resp = requests.get(
+                url, params=params, headers=self._headers(), timeout=self._timeout
+            )
+            self._ensure_ok(resp, "GET", url)
+            try:
+                data = resp.json()
+            except ValueError as exc:
+                raise SekoiaAPIError(
+                    f"GET {url} returned non-JSON body: {resp.text[:500]}"
+                ) from exc
+
+            items = data.get("items") or data.get("data") or []
+            if not isinstance(items, list):
+                raise SekoiaAPIError(
+                    f"GET {url} returned unexpected list shape: {resp.text[:500]}"
+                )
+
+            for item in items:
+                if match_author and item.get("author") != match_author:
+                    # Server-side filter didn't apply (older API, unknown
+                    # query param); fall back to client-side filtering.
+                    continue
+                yield item
+
+            if len(items) < page_size:
+                return
+            offset += page_size
