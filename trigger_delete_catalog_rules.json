@@ -1,0 +1,37 @@
+{
+  "uuid": "d2fdf0ef-c8bc-4fa8-ab19-dfc83c541454",
+  "name": "Delete all Valhalla-imported rules from the Sekoia Rules Catalog",
+  "description": "One-shot cleanup: deletes every rule that `sync-sigma-rules-catalog` created in this tenant (identified via the module's local id-map). Never touches user-created rules or Sekoia's verified catalog. Defaults to dry-run — set `confirm=true` in the trigger configuration for deletions to actually run. After the first pass the id-map is empty; subsequent runs are no-ops.",
+  "docker_parameters": "delete-catalog-rules",
+  "arguments": {
+    "type": "object",
+    "properties": {
+      "confirm": {
+        "type": "boolean",
+        "title": "Confirm deletion",
+        "description": "Must be true for rules to actually be deleted. When false, the trigger emits a report of what WOULD be deleted and makes no API calls.",
+        "default": false
+      },
+      "frequency": {
+        "type": "integer",
+        "title": "Re-run frequency in seconds",
+        "description": "How often to re-check the id-map for anything left to delete. After a successful first pass this is a no-op. Default 24h.",
+        "default": 86400,
+        "minimum": 3600
+      }
+    }
+  },
+  "results": {
+    "type": "object",
+    "properties": {
+      "dry_run": { "type": "boolean" },
+      "total_known": { "type": "integer" },
+      "deleted": { "type": "integer" },
+      "delete_failed": { "type": "integer" },
+      "remaining": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  }
+}

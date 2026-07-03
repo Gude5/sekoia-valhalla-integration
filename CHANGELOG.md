@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+- **Breaking**: `delete-catalog-rules` is now a **Trigger**, not an Action.
+  Playbooks that invoked the action step must be replaced by enabling the
+  new trigger with `confirm=true` in its configuration. Runs the cleanup
+  once on start (deletes every rule the sync trigger created, identified
+  via the local id-map), emits a summary event
+  (`valhalla-sigma-catalog-delete`), then idles on a configurable interval
+  (`frequency`, default 24h). Subsequent runs are cheap no-ops after the
+  first pass empties the id-map. Same safety default: `confirm=false` is
+  dry-run-only, no API calls.
+
 ### Fixed
 - `datasources` is no longer sent in the Rules Catalog POST body. Sekoia's
   schema expects a list of tenant-registered data-source **UUIDs**, not
