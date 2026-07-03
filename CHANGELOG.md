@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+- `delete-catalog-rules` trigger's zero-match diagnostic now also logs
+  the sample rule's field key set and a truncated JSON dump of the first
+  rule. This exposes what fields the list endpoint actually returns, so
+  operators can pick a real marker when `author` turns out to be
+  unpopulated (or absent from the list response).
 - `delete-catalog-rules` trigger now emits a diagnostic when zero rules
   match the configured `author`: it samples the first 200 tenant rules
   unfiltered and logs a histogram of the actual `author` values

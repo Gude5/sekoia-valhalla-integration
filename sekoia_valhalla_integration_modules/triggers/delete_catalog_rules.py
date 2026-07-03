@@ -1,3 +1,4 @@
+import json
 from collections import Counter
 
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -7,6 +8,7 @@ from sekoia_valhalla_integration_modules.sekoia_client import SekoiaClient
 
 SAMPLE_UUIDS_LOGGED = 5
 DIAGNOSTIC_SAMPLE_SIZE = 200
+DIAGNOSTIC_RULE_DUMP_CHARS = 2000
 DEFAULT_AUTHOR = "valhalla-integration"
 
 
@@ -129,14 +131,29 @@ class DeleteCatalogRules(Trigger):
 
     def _peek_authors(self) -> Counter:
         """Sample the first N rules unfiltered and return a histogram of
-        their ``author`` values. Runs on the zero-match branch so operators
-        can see what markers Sekoia actually stamps."""
+        their ``author`` values. Also logs the key set of a sample rule
+        and a JSON-dumped preview, so operators can spot other fields
+        usable as delete-time markers when ``author`` is unset."""
         histogram: Counter = Counter()
+        first_rule: dict | None = None
         try:
             for i, rule in enumerate(self._sekoia.iter_rules()):
                 if i >= DIAGNOSTIC_SAMPLE_SIZE:
                     break
+                if first_rule is None:
+                    first_rule = rule
                 histogram[rule.get("author") or "<null>"] += 1
         except Exception as exc:
             self.log(f"Diagnostic peek failed: {exc}", level="warning")
+
+        if first_rule is not None:
+            preview = json.dumps(first_rule, default=str)[
+                :DIAGNOSTIC_RULE_DUMP_CHARS
+            ]
+            self.log(
+                f"Diagnostic — sample rule keys: {sorted(first_rule.keys())}. "
+                f"First rule (truncated to {DIAGNOSTIC_RULE_DUMP_CHARS} chars): "
+                f"{preview}",
+                level="info",
+            )
         return histogram
