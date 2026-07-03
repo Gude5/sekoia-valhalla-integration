@@ -11,31 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `delete-catalog-rules` trigger's zero-match diagnostic now also logs
   the sample rule's field key set and a truncated JSON dump of the first
   rule. This exposes what fields the list endpoint actually returns, so
-  operators can pick a real marker when `author` turns out to be
-  unpopulated (or absent from the list response).
-- `delete-catalog-rules` trigger now emits a diagnostic when zero rules
-  match the configured `author`: it samples the first 200 tenant rules
-  unfiltered and logs a histogram of the actual `author` values
-  observed. The histogram is also included in the summary event under
-  `observed_authors`. This makes the "what should I set `author` to?"
-  question self-service: run once in dry-run, read the top authors, set
-  the config accordingly.
+  operators can pick a real marker when the configured field turns out to
+  be unpopulated (or absent from the list response).
 
 ### Changed
+- `delete-catalog-rules` trigger's filter is now generic: two config fields
+  `match_field` (default `created_by`) and `match_value` (default empty).
+  When `match_value` is empty the trigger runs in diagnostic-only mode and
+  logs the top values observed for `match_field` in the tenant, so
+  operators can spot their API key's UUID (visible as `created_by` on
+  every rule the sync trigger created) without leaving Sekoia. Prior
+  `author`-based filter is dropped because Sekoia's list endpoint doesn't
+  return an `author` field. Summary event fields renamed from `author` →
+  `match_field`+`match_value`; observed histogram now under
+  `observed_<field>` (e.g. `observed_created_by`).
 - `delete-catalog-rules` trigger no longer depends on a local id-map (which
   isn't visible across Sekoia's per-trigger persistent volumes). It now
   enumerates the Sekoia Rules Catalog via
-  `GET /v1/sic/conf/rules-catalog/rules` and deletes every rule whose
-  top-level `author` field matches a configurable marker
-  (default `valhalla-integration` — Sekoia stamps this on every rule the
-  sync trigger's API key creates). Handles pagination. Server-side filter
-  is passed as `match[author]=<value>`; a client-side filter is applied
-  as a safety net so we never delete a rule whose `author` doesn't match.
-  New optional trigger config: `author` (defaults to `valhalla-integration`).
-  Summary event now includes `total_matched` (instead of `total_known`)
-  and the matched `author` value.
-- SekoiaClient gained `iter_rules(match_author=..., page_size=100)` — a
-  paginated generator over the Rules Catalog list endpoint.
+  `GET /v1/sic/conf/rules-catalog/rules`, handles pagination, and filters
+  rules by the configured field. Server-side filter is passed as
+  `match[<field>]=<value>`; a client-side filter is applied as a safety
+  net so we never delete a rule whose field doesn't match.
+- SekoiaClient's `iter_rules` signature is now
+  `iter_rules(match_field=None, match_value=None, page_size=100)`.
 
 - **Breaking**: `delete-catalog-rules` is now a **Trigger**, not an Action.
   Playbooks that invoked the action step must be replaced by enabling the

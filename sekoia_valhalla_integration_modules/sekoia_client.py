@@ -65,19 +65,23 @@ class SekoiaClient:
 
     def iter_rules(
         self,
-        match_author: Optional[str] = None,
+        match_field: Optional[str] = None,
+        match_value: Optional[str] = None,
         page_size: int = LIST_PAGE_SIZE,
     ) -> Iterator[dict]:
         """Paginate ``GET /v1/sic/conf/rules-catalog/rules`` and yield
-        each rule dict. When ``match_author`` is set, only rules whose
-        top-level ``author`` field equals that string are yielded.
+        each rule dict. When ``match_field`` and ``match_value`` are set,
+        only rules whose top-level ``match_field`` equals ``match_value``
+        are yielded. Server-side filtering is attempted via
+        ``match[<field>]=<value>``; a client-side filter is applied as a
+        safety net so we never yield a rule that doesn't match.
         """
         url = f"{self._base_url}/v1/sic/conf/rules-catalog/rules"
         offset = 0
         while True:
             params: dict[str, object] = {"limit": page_size, "offset": offset}
-            if match_author:
-                params["match[author]"] = match_author
+            if match_field and match_value:
+                params[f"match[{match_field}]"] = match_value
             resp = requests.get(
                 url, params=params, headers=self._headers(), timeout=self._timeout
             )
@@ -96,9 +100,9 @@ class SekoiaClient:
                 )
 
             for item in items:
-                if match_author and item.get("author") != match_author:
-                    # Server-side filter didn't apply (older API, unknown
-                    # query param); fall back to client-side filtering.
+                if match_field and match_value and item.get(match_field) != match_value:
+                    # Server-side filter didn't apply (unknown query param);
+                    # fall back to client-side filtering.
                     continue
                 yield item
 
