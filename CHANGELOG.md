@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+- `delete-catalog-rules` trigger now emits a diagnostic when zero rules
+  match the configured `author`: it samples the first 200 tenant rules
+  unfiltered and logs a histogram of the actual `author` values
+  observed. The histogram is also included in the summary event under
+  `observed_authors`. This makes the "what should I set `author` to?"
+  question self-service: run once in dry-run, read the top authors, set
+  the config accordingly.
+
 ### Changed
 - `delete-catalog-rules` trigger no longer depends on a local id-map (which
   isn't visible across Sekoia's per-trigger persistent volumes). It now

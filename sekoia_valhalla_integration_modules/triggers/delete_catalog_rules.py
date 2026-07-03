@@ -1,9 +1,12 @@
+from collections import Counter
+
 from apscheduler.schedulers.blocking import BlockingScheduler
 from sekoia_automation.trigger import Trigger
 
 from sekoia_valhalla_integration_modules.sekoia_client import SekoiaClient
 
 SAMPLE_UUIDS_LOGGED = 5
+DIAGNOSTIC_SAMPLE_SIZE = 200
 DEFAULT_AUTHOR = "valhalla-integration"
 
 
@@ -45,8 +48,13 @@ class DeleteCatalogRules(Trigger):
             total = len(matches)
 
             if total == 0:
+                author_histogram = self._peek_authors()
                 self.log(
-                    f"Nothing to delete: no rules match author={self._author!r}.",
+                    f"Nothing to delete: no rules match author={self._author!r}. "
+                    f"Sampled {sum(author_histogram.values())} tenant rules; "
+                    f"top authors observed: {dict(author_histogram.most_common(10))}. "
+                    f"If your Valhalla-imported rules use a different author "
+                    f"value, override it via the trigger's `author` config.",
                     level="info",
                 )
                 self.send_event(
@@ -58,6 +66,7 @@ class DeleteCatalogRules(Trigger):
                         "deleted": 0,
                         "delete_failed": 0,
                         "remaining": [],
+                        "observed_authors": dict(author_histogram.most_common(10)),
                     },
                 )
                 return
@@ -117,3 +126,17 @@ class DeleteCatalogRules(Trigger):
             self.log_exception(
                 exc, message="Failed to delete Valhalla-imported Rules Catalog rules"
             )
+
+    def _peek_authors(self) -> Counter:
+        """Sample the first N rules unfiltered and return a histogram of
+        their ``author`` values. Runs on the zero-match branch so operators
+        can see what markers Sekoia actually stamps."""
+        histogram: Counter = Counter()
+        try:
+            for i, rule in enumerate(self._sekoia.iter_rules()):
+                if i >= DIAGNOSTIC_SAMPLE_SIZE:
+                    break
+                histogram[rule.get("author") or "<null>"] += 1
+        except Exception as exc:
+            self.log(f"Diagnostic peek failed: {exc}", level="warning")
+        return histogram
