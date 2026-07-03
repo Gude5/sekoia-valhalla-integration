@@ -45,17 +45,18 @@ class SyncSigmaRulesCatalog(Trigger):
                     if not valhalla_id:
                         continue
 
-                    converted_yaml, unmapped = convert_payload_to_ecs(
+                    parsed, unmapped = convert_payload_to_ecs(
                         rule.get("content", "")
                     )
-                    if converted_yaml is None:
+                    if parsed is None:
                         skipped_unmapped += 1
                         for f in unmapped:
                             unmapped_field_counter[f] += 1
                         continue
 
                     body = sigma_rule_to_catalog_payload(
-                        {**rule, "content": converted_yaml},
+                        rule,
+                        parsed,
                         self._alert_type_uuid,
                         self._enabled,
                     )

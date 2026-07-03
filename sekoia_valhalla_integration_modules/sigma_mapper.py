@@ -4,13 +4,24 @@ from typing import Optional
 import yaml
 
 SEVERITY_MAP = {
-    "informational": 20,
+    "informational": 10,
     "low": 30,
-    "medium": 40,
+    "medium": 50,
     "high": 70,
     "critical": 90,
 }
-DEFAULT_SEVERITY = 40
+# Returned when the Sigma rule has no ``level`` field at all.
+DEFAULT_SEVERITY = 0
+
+# Sekoia ``effort`` is derived from Sigma's rule maturity (``status`` field).
+STATUS_TO_EFFORT = {
+    "stable": 1,
+    "test": 2,
+    "experimental": 3,
+    "unsupported": 4,
+    "deprecated": 4,
+}
+# Returned when the Sigma rule has no ``status`` field.
 DEFAULT_EFFORT = 2
 
 # Sekoia Rules Catalog API rejects (HTTP 400 VA301) rule names longer than
@@ -305,17 +316,23 @@ def _convert_selection(
 def convert_payload_to_ecs(
     payload_yaml: str,
     mapping: Optional[dict[str, str]] = None,
-) -> tuple[Optional[str], list[str]]:
-    """Convert a Sigma rule YAML payload's detection block to ECS field names.
+) -> tuple[Optional[dict], list[str]]:
+    """Parse a Sigma rule YAML, ECS-convert its detection block, return the
+    parsed rule as a dict.
+
+    Only ``parsed["detection"]`` is transformed. Every other field
+    (``title``, ``description``, ``level``, ``status``, ``tags``,
+    ``logsource``, ``falsepositives``, ``related``, ...) is left unchanged
+    so the caller can lift them into structured Sekoia body fields.
 
     Args:
         payload_yaml: The raw Sigma rule YAML text.
         mapping: Field-name mapping to use. Defaults to :data:`RAW_TO_ECS`.
 
     Returns:
-        ``(converted_yaml, [])`` if every field in every selection block is
-        resolvable, otherwise ``(None, [unique_unmapped_field_names])``. The
-        list is de-duplicated and sorted for stable output.
+        ``(parsed_rule_dict, [])`` if every field in every selection block
+        is resolvable, otherwise ``(None, [unique_unmapped_field_names])``.
+        The unmapped list is de-duplicated and sorted for stable output.
 
         On YAML parse failure returns ``(None, ["<yaml-parse-error>"])``.
         On missing/malformed detection block returns
@@ -351,35 +368,78 @@ def convert_payload_to_ecs(
         return None, sorted(set(unmapped))
 
     parsed["detection"] = new_detection
-    return (
-        yaml.safe_dump(parsed, sort_keys=False, allow_unicode=True),
-        [],
-    )
+    return parsed, []
 
 
 def sigma_rule_to_catalog_payload(
-    rule: dict, alert_type_uuid: str, enabled: bool
+    rule: dict,
+    parsed: dict,
+    alert_type_uuid: str,
+    enabled: bool,
 ) -> dict:
-    payload_yaml = rule["content"]
-    try:
-        parsed = yaml.safe_load(payload_yaml) or {}
-    except yaml.YAMLError:
-        parsed = {}
+    """Build the Sekoia Rules Catalog POST body.
 
+    Metadata (name, description, severity, effort, tags, datasources, ...)
+    is lifted from the parsed Sigma rule dict into structured Sekoia fields.
+    The ``payload`` is only the ECS-converted ``detection:`` block,
+    YAML-serialised with the ``detection:`` keyword preserved.
+
+    Optional Sekoia fields (``community_uuid``, ``tags``, ``datasources``,
+    ``related_object_refs``, ``false_positives``) are included only when
+    the source Sigma rule actually carries the corresponding data.
+    """
     title = parsed.get("title") or rule.get("name") or rule.get("filename") or "unnamed"
     if len(title) > MAX_NAME_LENGTH:
         title = title[: MAX_NAME_LENGTH - len(_TRUNCATION_MARKER)] + _TRUNCATION_MARKER
+
     description = parsed.get("description") or rule.get("description") or ""
+
     level = (parsed.get("level") or rule.get("level") or "").lower()
     severity = SEVERITY_MAP.get(level, DEFAULT_SEVERITY)
 
-    return {
+    status = (parsed.get("status") or "").lower()
+    effort = STATUS_TO_EFFORT.get(status, DEFAULT_EFFORT)
+
+    # payload = only the detection block, YAML-serialised with the
+    # ``detection:`` key so it round-trips back to the Sigma detection shape.
+    detection_only = {"detection": parsed.get("detection", {})}
+    payload_yaml = yaml.safe_dump(
+        detection_only, sort_keys=False, allow_unicode=True
+    )
+
+    body: dict = {
         "name": title,
         "type": "sigma",
         "description": description,
         "payload": payload_yaml,
         "severity": severity,
-        "effort": DEFAULT_EFFORT,
+        "effort": effort,
         "alert_type_uuid": alert_type_uuid,
         "enabled": enabled,
     }
+
+    # Optional fields — include only when the Sigma rule actually has them.
+    valhalla_id = rule.get("id") or parsed.get("id")
+    if valhalla_id:
+        body["community_uuid"] = valhalla_id
+
+    tags = parsed.get("tags")
+    if tags:
+        body["tags"] = tags
+
+    logsource = parsed.get("logsource")
+    if logsource:
+        body["datasources"] = logsource
+
+    related = parsed.get("related")
+    if related:
+        body["related_object_refs"] = related
+
+    falsepositives = parsed.get("falsepositives")
+    if falsepositives:
+        if isinstance(falsepositives, list):
+            body["false_positives"] = "\n".join(str(x) for x in falsepositives)
+        else:
+            body["false_positives"] = str(falsepositives)
+
+    return body

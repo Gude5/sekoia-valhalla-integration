@@ -98,6 +98,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Injection In TP-Link Archer AX21`) were previously rejected with
   `HTTP 400 VA301`; they are now truncated with a `…` suffix so operators
   can still recognise the source rule.
+- **Rules Catalog POST body restructured** to fit Sekoia's structured
+  schema: the `payload` field now carries **only** the ECS-converted
+  `detection:` block (YAML-serialised, `detection:` keyword preserved).
+  Sigma metadata that used to live inside the payload YAML is now lifted
+  into individual Sekoia top-level fields:
+  - `name` ← Sigma `title` (100-char truncation preserved)
+  - `description` ← Sigma `description`
+  - `severity` ← Sigma `level`, remapped: `informational=10`, `low=30`,
+    `medium=50`, `high=70`, `critical=90`, missing level → `0`
+  - `effort` ← Sigma `status`: `stable=1`, `test=2`, `experimental=3`,
+    `unsupported=4`, `deprecated=4`, missing status → `2` (test)
+  - `community_uuid` ← Valhalla rule `id` (optional; only shipped when set)
+  - `tags` ← Sigma `tags` list (optional)
+  - `datasources` ← Sigma `logsource` dict (optional)
+  - `related_object_refs` ← Sigma `related` list (optional)
+  - `false_positives` ← Sigma `falsepositives` list, joined with newlines
+    (optional)
+  - `type` unchanged (`"sigma"`)
+- Optional fields are omitted entirely from the POST body when the source
+  Sigma rule doesn't carry the corresponding data.
+- `convert_payload_to_ecs()` now returns the parsed rule dict directly
+  (with an ECS-converted `detection` block) instead of a re-serialised
+  YAML string. The trigger and any other caller must adjust accordingly.
 - New Action **`delete-catalog-rules`** — on-demand cleanup that deletes
   every rule the `sync-sigma-rules-catalog` trigger created in the tenant,
   identified via the persisted `valhalla_id → sekoia_uuid` map. Never touches
