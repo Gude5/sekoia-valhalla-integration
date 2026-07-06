@@ -24,6 +24,16 @@ STATUS_TO_EFFORT = {
 # Returned when the Sigma rule has no ``status`` field.
 DEFAULT_EFFORT = 2
 
+# Ordinal ranks used by the sync trigger to filter rules by minimum
+# maturity. ``unsupported`` is the least mature, ``stable`` the most.
+STATUS_RANK = {
+    "unsupported": 1,
+    "deprecated": 2,
+    "experimental": 3,
+    "test": 4,
+    "stable": 5,
+}
+
 # Sekoia Rules Catalog API rejects (HTTP 400 VA301) rule names longer than
 # 100 characters. Truncate defensively and mark truncation with a single-char
 # Unicode ellipsis so operators can still recognise the rule.

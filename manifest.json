@@ -10,12 +10,6 @@
         "description": "API key from valhalla.nextron-systems.com. The default is the public demo key, which only grants the community feed.",
         "default": "1111111111111111111111111111111111111111111111111111111111111111"
       },
-      "base_url": {
-        "type": "string",
-        "title": "Valhalla base URL",
-        "description": "Override the Valhalla API base URL.",
-        "default": "https://valhalla.nextron-systems.com"
-      },
       "sekoia_api_key": {
         "type": "string",
         "title": "Sekoia API key",
@@ -36,5 +30,5 @@
   "slug": "sekoia-valhalla-integration",
   "categories": ["Threat Intelligence"],
   "uuid": "ee90bd76-6805-4298-a25d-c8950f0209ec",
-  "version": "0.5.7"
+  "version": "0.6.0"
 }

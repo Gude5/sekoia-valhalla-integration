@@ -1,5 +1,6 @@
 from collections import Counter
 
+import yaml
 from apscheduler.schedulers.blocking import BlockingScheduler
 from sekoia_automation.storage import PersistentJSON
 from sekoia_automation.trigger import Trigger
@@ -10,21 +11,29 @@ from sekoia_valhalla_integration_modules.sekoia_client import (
     SekoiaRuleNotFoundError,
 )
 from sekoia_valhalla_integration_modules.sigma_mapper import (
+    SEVERITY_MAP,
+    STATUS_RANK,
     convert_payload_to_ecs,
     sigma_rule_to_catalog_payload,
 )
 
 UUID_MAP_FILE = "valhalla-sigma-catalog-uuid-map.json"
 TOP_UNMAPPED_REPORT = 20
+DEFAULT_MIN_LEVEL = "informational"
+DEFAULT_MIN_STATUS = "unsupported"
 
 
 class SyncSigmaRulesCatalog(Trigger):
     def run(self):
         cfg = self.module.configuration
-        self._valhalla = ValhallaClient(cfg.base_url, cfg.api_key)
+        self._valhalla = ValhallaClient(cfg.api_key)
         self._sekoia = SekoiaClient(cfg.sekoia_base_url, cfg.sekoia_api_key)
         self._alert_type_uuid = self.configuration["alert_type_uuid"]
         self._enabled = self.configuration.get("enabled", False)
+        min_level = self.configuration.get("min_sigma_level", DEFAULT_MIN_LEVEL)
+        min_status = self.configuration.get("min_sigma_status", DEFAULT_MIN_STATUS)
+        self._min_severity = SEVERITY_MAP[min_level]
+        self._min_status_rank = STATUS_RANK[min_status]
         frequency = self.configuration.get("frequency", 86400)
 
         self._sync_once()
@@ -33,6 +42,27 @@ class SyncSigmaRulesCatalog(Trigger):
         scheduler.add_job(self._sync_once, "interval", seconds=frequency)
         scheduler.start()
 
+    def _rule_passes_filter(self, content_yaml: str) -> bool:
+        """Return True when the rule's Sigma ``level`` and ``status``
+        both exist and meet the configured minimums. Rules missing
+        either field are always filtered out."""
+        try:
+            parsed = yaml.safe_load(content_yaml) or {}
+        except yaml.YAMLError:
+            return False
+        if not isinstance(parsed, dict):
+            return False
+        level = (parsed.get("level") or "").lower()
+        status = (parsed.get("status") or "").lower()
+        level_score = SEVERITY_MAP.get(level)
+        status_rank = STATUS_RANK.get(status)
+        if level_score is None or status_rank is None:
+            return False
+        return (
+            level_score >= self._min_severity
+            and status_rank >= self._min_status_rank
+        )
+
     def _sync_once(self):
         try:
             rules = self._valhalla.get_sigma_feed()
@@ -40,6 +70,7 @@ class SyncSigmaRulesCatalog(Trigger):
             updated = 0
             failed = 0
             skipped_unmapped = 0
+            skipped_filter = 0
             unmapped_field_counter: Counter[str] = Counter()
             first_failure_logged = False
             with PersistentJSON(UUID_MAP_FILE, self.data_path) as id_map:
@@ -48,9 +79,12 @@ class SyncSigmaRulesCatalog(Trigger):
                     if not valhalla_id:
                         continue
 
-                    parsed, unmapped = convert_payload_to_ecs(
-                        rule.get("content", "")
-                    )
+                    content = rule.get("content", "")
+                    if not self._rule_passes_filter(content):
+                        skipped_filter += 1
+                        continue
+
+                    parsed, unmapped = convert_payload_to_ecs(content)
                     if parsed is None:
                         skipped_unmapped += 1
                         for f in unmapped:
@@ -100,7 +134,8 @@ class SyncSigmaRulesCatalog(Trigger):
             self.log(
                 f"Catalog sync: created={created} updated={updated} "
                 f"failed={failed} skipped_unmapped={skipped_unmapped} "
-                f"total_rules={len(rules)} top_unmapped={top_unmapped}",
+                f"skipped_filter={skipped_filter} total_rules={len(rules)} "
+                f"top_unmapped={top_unmapped}",
                 level="info",
             )
             self.send_event(
@@ -110,6 +145,7 @@ class SyncSigmaRulesCatalog(Trigger):
                     "updated": updated,
                     "failed": failed,
                     "skipped_unmapped": skipped_unmapped,
+                    "skipped_filter": skipped_filter,
                     "total_rules": len(rules),
                     "top_unmapped": top_unmapped,
                 },

@@ -22,6 +22,20 @@
         "title": "Enable rules on push",
         "description": "When false (default), rules land in the catalog disabled — users opt in per rule.",
         "default": false
+      },
+      "min_sigma_level": {
+        "type": "string",
+        "title": "Minimum Sigma level",
+        "description": "Only rules with a Sigma `level` at least this severe are imported. Rules missing the `level` field are always skipped.",
+        "enum": ["informational", "low", "medium", "high", "critical"],
+        "default": "informational"
+      },
+      "min_sigma_status": {
+        "type": "string",
+        "title": "Minimum Sigma status",
+        "description": "Only rules with a Sigma `status` at least this mature are imported (ordering: unsupported < deprecated < experimental < test < stable). Rules missing the `status` field are always skipped.",
+        "enum": ["unsupported", "deprecated", "experimental", "test", "stable"],
+        "default": "unsupported"
       }
     },
     "required": ["alert_type_uuid"]

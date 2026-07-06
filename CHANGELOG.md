@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+- `sync-sigma-rules-catalog` trigger gained two dropdown configs:
+  `min_sigma_level` (default `informational`) and `min_sigma_status`
+  (default `unsupported`). Rules whose Sigma `level` is below the
+  configured minimum (order: informational < low < medium < high <
+  critical) or whose `status` is below the configured minimum (order:
+  unsupported < deprecated < experimental < test < stable) are skipped.
+  Rules **missing** either the `level` or `status` field are now
+  always skipped, regardless of the thresholds. Filter hits are counted
+  in the new `skipped_filter` counter on the summary event.
 - `delete-catalog-rules` trigger's zero-match diagnostic now also logs
   the sample rule's field key set and a truncated JSON dump of the first
   rule. This exposes what fields the list endpoint actually returns, so
@@ -34,6 +43,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   net so we never delete a rule whose field doesn't match.
 - SekoiaClient's `iter_rules` signature is now
   `iter_rules(match_field=None, match_value=None, page_size=100)`.
+- **Breaking**: The module-level `base_url` (Valhalla) config field is
+  removed. The Valhalla API URL is now hardcoded to
+  `https://valhalla.nextron-systems.com` in the client
+  (`VALHALLA_BASE_URL`). Existing playbooks whose module config sets
+  `base_url` will silently ignore the value on redeploy; there is
+  nothing to migrate.
 
 - **Breaking**: `delete-catalog-rules` is now a **Trigger**, not an Action.
   Playbooks that invoked the action step must be replaced by enabling the

@@ -17,7 +17,7 @@ SEEN_FILE = "valhalla-sigma-ic-seen.json"
 class SyncSigmaIntelligenceCenter(Trigger):
     def run(self):
         cfg = self.module.configuration
-        self._client = ValhallaClient(cfg.base_url, cfg.api_key)
+        self._client = ValhallaClient(cfg.api_key)
         frequency = self.configuration.get("frequency", 86400)
 
         self._pull_once()

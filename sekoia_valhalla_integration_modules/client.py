@@ -1,9 +1,11 @@
 import requests
 
+VALHALLA_BASE_URL = "https://valhalla.nextron-systems.com"
+
 
 class ValhallaClient:
-    def __init__(self, base_url: str, api_key: str, timeout: float = 60.0):
-        self._base_url = base_url.rstrip("/")
+    def __init__(self, api_key: str, timeout: float = 60.0):
+        self._base_url = VALHALLA_BASE_URL
         self._api_key = api_key
         self._timeout = timeout
 
