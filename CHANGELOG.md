@@ -46,6 +46,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dry-run-only, no API calls.
 
 ### Fixed
+- `sync-sigma-rules-catalog` trigger now self-heals stale id-map entries.
+  When Sekoia returns HTTP 403 (code AU202) or 404 on a PUT — indicating
+  the target UUID no longer exists for this API key (usually because the
+  tenant was cleaned up via `delete-catalog-rules`) — the trigger drops
+  the entry from the local map and POSTs the rule as new. Previously
+  every stale entry counted as a hard failure, and the map had to be
+  wiped manually before rules could be reimported. SekoiaClient gained a
+  new `SekoiaRuleNotFoundError` exception (subclass of `SekoiaAPIError`)
+  raised on 403/404 from `update_rule`; `SekoiaAPIError` also now
+  carries the HTTP `status_code` on the exception object.
 - `datasources` is no longer sent in the Rules Catalog POST body. Sekoia's
   schema expects a list of tenant-registered data-source **UUIDs**, not
   the free-form Sigma `logsource` dict. Previously every rule with a

@@ -6,6 +6,18 @@ import requests
 class SekoiaAPIError(RuntimeError):
     """Raised when the Sekoia API returns a non-2xx response or an unexpected body."""
 
+    def __init__(self, message: str, status_code: Optional[int] = None):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+class SekoiaRuleNotFoundError(SekoiaAPIError):
+    """Raised on PUT to a rule UUID that Sekoia doesn't own for this API
+    key. Sekoia returns HTTP 403 (code AU202) for UUIDs that were
+    previously created by this key but have since been deleted, so we
+    treat 403 and 404 on ``update_rule`` interchangeably as "stale
+    identifier — POST it as new instead"."""
+
 
 LIST_PAGE_SIZE = 100
 
@@ -28,7 +40,8 @@ class SekoiaClient:
             return
         body = resp.text[:500]
         raise SekoiaAPIError(
-            f"{method} {url} returned HTTP {resp.status_code}: {body}"
+            f"{method} {url} returned HTTP {resp.status_code}: {body}",
+            status_code=resp.status_code,
         )
 
     def create_rule(self, body: dict) -> str:
@@ -52,6 +65,11 @@ class SekoiaClient:
     def update_rule(self, sekoia_uuid: str, body: dict) -> None:
         url = f"{self._base_url}/v1/sic/conf/rules-catalog/rules/{sekoia_uuid}"
         resp = requests.put(url, json=body, headers=self._headers(), timeout=self._timeout)
+        if resp.status_code in (403, 404):
+            raise SekoiaRuleNotFoundError(
+                f"PUT {url} returned HTTP {resp.status_code}: {resp.text[:500]}",
+                status_code=resp.status_code,
+            )
         self._ensure_ok(resp, "PUT", url)
 
     def delete_rule(self, sekoia_uuid: str) -> None:

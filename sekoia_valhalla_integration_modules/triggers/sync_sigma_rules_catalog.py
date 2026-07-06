@@ -5,7 +5,10 @@ from sekoia_automation.storage import PersistentJSON
 from sekoia_automation.trigger import Trigger
 
 from sekoia_valhalla_integration_modules.client import ValhallaClient
-from sekoia_valhalla_integration_modules.sekoia_client import SekoiaClient
+from sekoia_valhalla_integration_modules.sekoia_client import (
+    SekoiaClient,
+    SekoiaRuleNotFoundError,
+)
 from sekoia_valhalla_integration_modules.sigma_mapper import (
     convert_payload_to_ecs,
     sigma_rule_to_catalog_payload,
@@ -62,8 +65,19 @@ class SyncSigmaRulesCatalog(Trigger):
                     )
                     try:
                         if valhalla_id in id_map:
-                            self._sekoia.update_rule(id_map[valhalla_id], body)
-                            updated += 1
+                            try:
+                                self._sekoia.update_rule(
+                                    id_map[valhalla_id], body
+                                )
+                                updated += 1
+                            except SekoiaRuleNotFoundError:
+                                # Stale id-map entry: the tenant-side rule
+                                # was deleted (or attributed to a different
+                                # key). Drop the entry and POST as new.
+                                del id_map[valhalla_id]
+                                sekoia_uuid = self._sekoia.create_rule(body)
+                                id_map[valhalla_id] = sekoia_uuid
+                                created += 1
                         else:
                             sekoia_uuid = self._sekoia.create_rule(body)
                             id_map[valhalla_id] = sekoia_uuid
