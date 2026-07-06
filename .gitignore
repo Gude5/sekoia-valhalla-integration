@@ -228,4 +228,5 @@ __marimo__/
 tests/
 scripts/
 e2e-subplans/
+docs/
 uv.lock

@@ -11,24 +11,36 @@ The `sync-sigma-rules-catalog` trigger fires on a configurable interval
 
 1. **Fetch.** `POST /api/v1/getsigma` against Valhalla with an API key
    returns the community Sigma feed (~3,600 rules).
-2. **Convert.** Every rule is split in two:
+2. **Filter.** Rules whose Sigma `level` or `status` is below the
+   configured threshold (`min_sigma_level`, `min_sigma_status`) are
+   skipped. Rules missing either field are also skipped.
+3. **Convert.** Every remaining rule is split in two:
    - **Metadata → structured JSON:** Sigma `title`, `description`, `level`,
      `status`, `tags`, `falsepositives`, `related` are lifted to top-level
      Sekoia fields (`name`, `description`, `severity`, `effort`, `tags`,
      `false_positives`, `related_object_refs`). Length caps enforced
-     (name 100 chars, description 1000 chars, truncated with `…`).
+     (name 100 chars, description 1000 chars, truncated with `…`). A
+     synthetic marker tag `valhalla-integration` is appended so the
+     delete trigger can identify our rules independently of the API key
+     that created them.
    - **Detection block → ECS field names:** raw SigmaHQ keys inside
      `detection:` (`CommandLine`, `EventID`, `TargetFilename`, …) are
      renamed to their Elastic Common Schema counterparts
      (`process.command_line`, `event.code`, `file.path`, …), because
      Sekoia's engine validates the block against ECS. Sigma field
      modifiers (`|contains`, `|endswith`, …) are preserved.
-3. **Push.** Each rule is POSTed to
+4. **Push.** Each rule is POSTed to
    `/v1/sic/conf/rules-catalog/rules` on first sight; subsequent runs PUT
    to the same UUID. A local id-map (`valhalla_id → sekoia_uuid`)
    distinguishes the two paths and self-heals stale entries (Sekoia
    returns HTTP 403 for deleted UUIDs; the trigger drops them and POSTs
    fresh).
+
+Cleanup is a separate `delete-catalog-rules` trigger that enumerates
+the tenant's Rules Catalog and deletes every rule carrying the marker
+tag. A field-based fallback (`match_field`/`match_value`) is available
+for cleaning up rules that predate the marker (e.g., imported by an
+older version of the integration).
 
 Config lives in two places: the module-level integration (Valhalla API
 key, Sekoia URL + API key — the Valhalla URL is hardcoded) and the
