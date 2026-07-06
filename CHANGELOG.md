@@ -46,7 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   operators can pick a real marker when the configured field turns out to
   be unpopulated (or absent from the list response).
 
-### Changed
 - `delete-catalog-rules` trigger's filter is now generic: two config fields
   `match_field` (default `created_by`) and `match_value` (default empty).
   When `match_value` is empty the trigger runs in diagnostic-only mode and
