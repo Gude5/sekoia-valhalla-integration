@@ -41,6 +41,11 @@ MAX_NAME_LENGTH = 100
 MAX_DESCRIPTION_LENGTH = 1000
 _TRUNCATION_MARKER = "…"
 
+# Marker tag appended to every rule the sync trigger POSTs. Used by the
+# delete trigger as the discriminator for "rules this integration created".
+# Stable across Sekoia API-key rotations (unlike ``created_by``).
+MARKER_TAG = "valhalla-integration"
+
 # Tier 1: clean 1:1 mappings from raw SigmaHQ field names to Elastic Common
 # Schema. Covers the ~34 most-frequent Windows/network/web fields in the
 # Valhalla feed. Extended in Stage 2 with context-aware branches for
@@ -444,9 +449,13 @@ def sigma_rule_to_catalog_payload(
     # Optional fields — include only when the Sigma rule actually has them.
     # community_uuid is deliberately not shipped (see docstring).
 
-    tags = parsed.get("tags")
-    if tags:
-        body["tags"] = tags
+    # Always attach the integration marker tag so the delete trigger can
+    # identify our rules independently of the Sekoia API key that created
+    # them (``created_by`` changes on key rotation; a tag does not).
+    tags = list(parsed.get("tags") or [])
+    if MARKER_TAG not in tags:
+        tags.append(MARKER_TAG)
+    body["tags"] = tags
 
     # Sekoia's `datasources` is a list of registered data-source UUIDs in the
     # tenant, not the free-form Sigma `logsource` dict — we have no reliable

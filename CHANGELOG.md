@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+- `sync-sigma-rules-catalog` trigger now attaches a marker tag
+  (`valhalla-integration`, exported as `sigma_mapper.MARKER_TAG`) to
+  every rule it POSTs. The tag survives Sekoia API-key rotations and
+  gives the delete trigger a stable discriminator independent of the
+  volatile `created_by` field.
+- `delete-catalog-rules` trigger has a new default **tag mode**:
+  filters by the marker tag instead of `created_by`. New config
+  `marker_tag` (default `valhalla-integration`). Setting it to empty
+  falls back to the existing field-based `match_field`/`match_value`
+  mode, useful for cleaning up rules that predate the marker tag.
+  Summary event now carries `marker_tag`; the zero-match diagnostic in
+  tag mode logs a histogram of tag names observed
+  (`observed_tags`).
 - `sync-sigma-rules-catalog` trigger gained two dropdown configs:
   `min_sigma_level` (default `informational`) and `min_sigma_status`
   (default `unsupported`). Rules whose Sigma `level` is below the

@@ -23,11 +23,18 @@ Implementation: [`sigma_rule_to_catalog_payload()`](../sekoia_valhalla_integrati
 | `alert_type_uuid`  | trigger config                     | Not derived from Sigma — supplied via the sync trigger's `alert_type_uuid` argument.                           |
 | `enabled`          | trigger config                     | Defaults to `false` — rules opt-in in the Sekoia UI.                                                           |
 
+## Marker tag
+
+Every synced rule carries a Sekoia tag `valhalla-integration`
+(`sigma_mapper.MARKER_TAG`) appended to whatever Sigma-side tags were on
+the source rule. The delete trigger's default mode filters on this tag,
+which is stable across Sekoia API-key rotations (unlike `created_by`).
+
 ## Fields shipped only when the Sigma source has them
 
 | Sekoia JSON field     | Source                | Notes                                                                                                          |
 | --------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `tags`                | Sigma `tags`          | Passed through as a list of strings.                                                                           |
+| `tags`                | Sigma `tags`          | Passed through as a list of strings. The marker tag `valhalla-integration` (`MARKER_TAG`) is always appended so the delete trigger can identify our rules across API-key rotations. |
 | `related_object_refs` | Sigma `related[].id`  | Sigma's `related` is a list of `{id, type}` dicts; only the UUID `id` values are forwarded. Rules whose entries lack an `id` do not ship the field. |
 | `false_positives`     | Sigma `falsepositives`| List of strings is joined with newlines; a bare string is passed through. Missing → field omitted.             |
 

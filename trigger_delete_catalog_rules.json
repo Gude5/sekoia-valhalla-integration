@@ -1,7 +1,7 @@
 {
   "uuid": "d2fdf0ef-c8bc-4fa8-ab19-dfc83c541454",
   "name": "Delete all Valhalla-imported rules from the Sekoia Rules Catalog",
-  "description": "Enumerates the Sekoia Rules Catalog and deletes every rule whose configured top-level field equals a configured value. Intended default: `match_field=created_by`, `match_value=<Sekoia API key UUID>` — every rule the sync trigger's API key creates carries that UUID in `created_by`, so filtering on it uniquely identifies our imports. Leave `match_value` empty on first run and the trigger will log the tenant's actual `created_by` UUIDs so you can pick the right one. Never touches user-created rules or Sekoia's verified catalog. Defaults to dry-run — set `confirm=true` for deletions to actually run.",
+  "description": "Deletes every rule the sync trigger created. Default mode: filters by the marker tag `valhalla-integration` that the sync trigger attaches to every rule (robust across API-key rotations). Advanced mode: clear `marker_tag` and configure `match_field`+`match_value` to filter by any top-level field — useful for cleaning up rules that predate the marker tag. Never touches user-created rules or Sekoia's verified catalog. Defaults to dry-run — set `confirm=true` for deletions to actually run.",
   "docker_parameters": "delete-catalog-rules",
   "arguments": {
     "type": "object",
@@ -12,16 +12,22 @@
         "description": "Must be true for rules to actually be deleted. When false, the trigger emits a report of what WOULD be deleted and makes no DELETE calls.",
         "default": false
       },
+      "marker_tag": {
+        "type": "string",
+        "title": "Marker tag",
+        "description": "Deletes every rule whose `tags` list contains a tag with this name. The sync trigger attaches `valhalla-integration` to every rule it POSTs. Leave empty to disable tag mode and use `match_field`/`match_value` instead.",
+        "default": "valhalla-integration"
+      },
       "match_field": {
         "type": "string",
-        "title": "Field to filter on",
-        "description": "Top-level rule field to match against. Default `created_by` (the UUID of the API key that created the rule). Advanced users can point this at any other field returned by the Rules Catalog list endpoint (`community_uuid`, `alert_type`, ...).",
+        "title": "Field to filter on (advanced, tag-mode disabled)",
+        "description": "Only used when `marker_tag` is empty. Top-level rule field to match against. Default `created_by` (the UUID of the API key that created the rule).",
         "default": "created_by"
       },
       "match_value": {
         "type": "string",
-        "title": "Value the field must equal",
-        "description": "Only rules whose `match_field` equals this value are deleted. When empty, the trigger runs in diagnostic mode and logs the top values observed in the tenant.",
+        "title": "Value the field must equal (advanced, tag-mode disabled)",
+        "description": "Only used when `marker_tag` is empty. When both are empty, the trigger runs in diagnostic mode and logs the top values observed in the tenant.",
         "default": ""
       },
       "frequency": {
@@ -37,6 +43,7 @@
     "type": "object",
     "properties": {
       "dry_run": { "type": "boolean" },
+      "marker_tag": { "type": "string" },
       "match_field": { "type": "string" },
       "match_value": { "type": "string" },
       "total_matched": { "type": "integer" },
