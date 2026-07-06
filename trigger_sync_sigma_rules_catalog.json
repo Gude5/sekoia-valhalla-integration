@@ -27,15 +27,27 @@
         "type": "string",
         "title": "Minimum Sigma level",
         "description": "Only rules with a Sigma `level` at least this severe are imported. Rules missing the `level` field are always skipped.",
-        "enum": ["informational", "low", "medium", "high", "critical"],
-        "default": "informational"
+        "default": "informational",
+        "oneOf": [
+          {"const": "informational", "title": "informational"},
+          {"const": "low", "title": "low"},
+          {"const": "medium", "title": "medium"},
+          {"const": "high", "title": "high"},
+          {"const": "critical", "title": "critical"}
+        ]
       },
       "min_sigma_status": {
         "type": "string",
         "title": "Minimum Sigma status",
         "description": "Only rules with a Sigma `status` at least this mature are imported (ordering: unsupported < deprecated < experimental < test < stable). Rules missing the `status` field are always skipped.",
-        "enum": ["unsupported", "deprecated", "experimental", "test", "stable"],
-        "default": "unsupported"
+        "default": "unsupported",
+        "oneOf": [
+          {"const": "unsupported", "title": "unsupported"},
+          {"const": "deprecated", "title": "deprecated"},
+          {"const": "experimental", "title": "experimental"},
+          {"const": "test", "title": "test"},
+          {"const": "stable", "title": "stable"}
+        ]
       }
     },
     "required": ["alert_type_uuid"]

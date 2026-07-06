@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+- `min_sigma_level` and `min_sigma_status` dropdown options are now
+  declared with explicit `oneOf` const+title entries so the Sekoia UI
+  displays them in lowercase (matching the underlying enum values)
+  instead of auto-capitalising them.
+
 ### Added
 - `sync-sigma-rules-catalog` trigger now attaches a marker tag
   (`valhalla-integration`, exported as `sigma_mapper.MARKER_TAG`) to
