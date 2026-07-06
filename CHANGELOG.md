@@ -46,6 +46,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dry-run-only, no API calls.
 
 ### Fixed
+- `community_uuid` is no longer sent in the Rules Catalog POST body.
+  Setting it in combination with other metadata fields (`tags`,
+  `description`, `false_positives`) triggered Sekoia's AU202 scope
+  check on every rule (an arbitrary Valhalla rule ID isn't a valid
+  reference into Sekoia's community catalog, and attaching a rule to
+  such a reference requires a permission we don't hold). Sekoia was
+  also silently overriding our value with its own default
+  (`4039e5c6-…`) on the rules that did get through, so the field was
+  never functional anyway. Every field-level bisect against a live
+  tenant confirmed the AU202 was gated on the presence of
+  `community_uuid`.
 - `sync-sigma-rules-catalog` trigger now self-heals stale id-map entries.
   When Sekoia returns HTTP 403 (code AU202) or 404 on a PUT — indicating
   the target UUID no longer exists for this API key (usually because the

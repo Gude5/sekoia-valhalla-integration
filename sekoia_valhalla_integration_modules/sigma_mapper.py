@@ -384,12 +384,16 @@ def sigma_rule_to_catalog_payload(
     ``payload`` is only the ECS-converted ``detection:`` block,
     YAML-serialised with the ``detection:`` keyword preserved.
 
-    Optional Sekoia fields (``community_uuid``, ``tags``,
-    ``related_object_refs``, ``false_positives``) are included only when
-    the source Sigma rule actually carries the corresponding data. Sekoia's
-    ``datasources`` is a list of tenant-registered data-source UUIDs and
-    is intentionally omitted (Sigma's ``logsource`` dict can't be mapped
-    to a tenant UUID without extra context).
+    Optional Sekoia fields (``tags``, ``related_object_refs``,
+    ``false_positives``) are included only when the source Sigma rule
+    actually carries the corresponding data.
+
+    ``community_uuid`` and ``datasources`` are intentionally omitted:
+    ``community_uuid`` requires a tenant-scoped write permission when
+    combined with rule metadata (setting it triggers Sekoia's AU202
+    scope check) and Sekoia silently overrides it with its own default
+    anyway; ``datasources`` is a list of tenant-registered data-source
+    UUIDs and can't be derived from Sigma's free-form ``logsource`` dict.
     """
     title = parsed.get("title") or rule.get("name") or rule.get("filename") or "unnamed"
     if len(title) > MAX_NAME_LENGTH:
@@ -422,9 +426,7 @@ def sigma_rule_to_catalog_payload(
     }
 
     # Optional fields — include only when the Sigma rule actually has them.
-    valhalla_id = rule.get("id") or parsed.get("id")
-    if valhalla_id:
-        body["community_uuid"] = valhalla_id
+    # community_uuid is deliberately not shipped (see docstring).
 
     tags = parsed.get("tags")
     if tags:
