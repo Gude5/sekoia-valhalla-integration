@@ -400,16 +400,19 @@ def sigma_rule_to_catalog_payload(
     ``payload`` is only the ECS-converted ``detection:`` block,
     YAML-serialised with the ``detection:`` keyword preserved.
 
-    Optional Sekoia fields (``tags``, ``related_object_refs``,
-    ``false_positives``) are included only when the source Sigma rule
-    actually carries the corresponding data.
+    Optional Sekoia fields (``tags``, ``false_positives``) are included
+    only when the source Sigma rule actually carries the corresponding
+    data.
 
-    ``community_uuid`` and ``datasources`` are intentionally omitted:
-    ``community_uuid`` requires a tenant-scoped write permission when
-    combined with rule metadata (setting it triggers Sekoia's AU202
-    scope check) and Sekoia silently overrides it with its own default
-    anyway; ``datasources`` is a list of tenant-registered data-source
-    UUIDs and can't be derived from Sigma's free-form ``logsource`` dict.
+    ``community_uuid``, ``related_object_refs`` and ``datasources`` are
+    intentionally omitted: ``community_uuid`` triggers Sekoia's AU202
+    scope check when combined with rule metadata (and Sekoia silently
+    overrides it with its own default anyway); ``related_object_refs``
+    expects Sekoia catalog UUIDs — the Sigma-world UUIDs from a rule's
+    ``related`` list don't correspond to anything in the tenant, so the
+    field would just carry dangling references; ``datasources`` is a
+    list of tenant-registered data-source UUIDs and can't be derived
+    from Sigma's free-form ``logsource`` dict.
     """
     title = parsed.get("title") or rule.get("name") or rule.get("filename") or "unnamed"
     if len(title) > MAX_NAME_LENGTH:
@@ -463,18 +466,7 @@ def sigma_rule_to_catalog_payload(
     # field is omitted. The Sigma logsource stays visible via the payload
     # YAML if needed downstream.
 
-    # `related_object_refs` is a list of Sekoia UUIDs. Sigma's `related`
-    # entries carry a UUID under `id` (plus a `type` string). Extract just
-    # the UUIDs.
-    related = parsed.get("related")
-    if related and isinstance(related, list):
-        related_ids = [
-            item["id"]
-            for item in related
-            if isinstance(item, dict) and item.get("id")
-        ]
-        if related_ids:
-            body["related_object_refs"] = related_ids
+    # `related_object_refs` is deliberately not shipped (see docstring).
 
     falsepositives = parsed.get("falsepositives")
     if falsepositives:

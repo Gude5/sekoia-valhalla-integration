@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Changed
+- `related_object_refs` is no longer sent in the Rules Catalog POST
+  body. Sigma's `related[].id` values are Sigma-world UUIDs that don't
+  correspond to any rule in the Sekoia tenant, so shipping them just
+  created dangling references. Same reasoning as `community_uuid`.
 - `min_sigma_level` and `min_sigma_status` dropdown options are now
   declared with explicit `oneOf` const+title entries so the Sekoia UI
   displays them in lowercase (matching the underlying enum values)

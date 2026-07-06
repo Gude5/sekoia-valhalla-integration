@@ -10,7 +10,7 @@ The `sync-sigma-rules-catalog` trigger fires on a configurable interval
 (default 24h). Each run:
 
 1. **Fetch.** `POST /api/v1/getsigma` against Valhalla with an API key
-   returns the community Sigma feed (~3,600 rules).
+   returns the Sigma feed (default demo API key returns ~3,600 rules).
 2. **Filter.** Rules whose Sigma `level` or `status` is below the
    configured threshold (`min_sigma_level`, `min_sigma_status`) are
    skipped. Rules missing either field are also skipped.
@@ -36,12 +36,6 @@ The `sync-sigma-rules-catalog` trigger fires on a configurable interval
    returns HTTP 403 for deleted UUIDs; the trigger drops them and POSTs
    fresh).
 
-Cleanup is a separate `delete-catalog-rules` trigger that enumerates
-the tenant's Rules Catalog and deletes every rule carrying the marker
-tag. A field-based fallback (`match_field`/`match_value`) is available
-for cleaning up rules that predate the marker (e.g., imported by an
-older version of the integration).
-
 Config lives in two places: the module-level integration (Valhalla API
 key, Sekoia URL + API key — the Valhalla URL is hardcoded) and the
 trigger-level playbook (alert type UUID, on-push enabled flag,
@@ -66,8 +60,7 @@ Yield against the live Valhalla demo feed: **2,961 / 3,591 rules
   no auto-enable path.
 - **Sigma correlation rules unsupported.** Multi-rule correlations
   aren't handled by the converter and would land malformed.
-- **Rules Catalog only.** Sync to the Intelligence Center is a separate
-  trigger; delete/cleanup a third.
+
 
 ## See also
 

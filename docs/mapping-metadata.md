@@ -35,15 +35,15 @@ which is stable across Sekoia API-key rotations (unlike `created_by`).
 | Sekoia JSON field     | Source                | Notes                                                                                                          |
 | --------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `tags`                | Sigma `tags`          | Passed through as a list of strings. The marker tag `valhalla-integration` (`MARKER_TAG`) is always appended so the delete trigger can identify our rules across API-key rotations. |
-| `related_object_refs` | Sigma `related[].id`  | Sigma's `related` is a list of `{id, type}` dicts; only the UUID `id` values are forwarded. Rules whose entries lack an `id` do not ship the field. |
 | `false_positives`     | Sigma `falsepositives`| List of strings is joined with newlines; a bare string is passed through. Missing → field omitted.             |
 
 ## Fields intentionally NOT shipped
 
-| Sekoia JSON field | Why omitted                                                                                                                                                                                                             |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `community_uuid`  | Setting an arbitrary Valhalla rule ID triggered Sekoia's AU202 scope check when combined with other metadata fields, and Sekoia overrode our value with its own default (`4039e5c6-…`) anyway. Verified via curl bisect. |
-| `datasources`     | Sekoia expects a list of tenant-registered data-source **UUIDs**, not the free-form Sigma `logsource` dict. Can't derive UUIDs from `{product, category}` without tenant-specific context. Sigma `logsource` remains visible via the payload YAML. |
+| Sekoia JSON field     | Why omitted                                                                                                                                                                                                             |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `community_uuid`      | Setting an arbitrary Valhalla rule ID triggered Sekoia's AU202 scope check when combined with other metadata fields, and Sekoia overrode our value with its own default (`4039e5c6-…`) anyway. Verified via curl bisect. |
+| `related_object_refs` | Sigma's `related[].id` values are Sigma-world UUIDs; Sekoia's field expects UUIDs of other rules in the tenant's Rules Catalog. The Sigma UUIDs don't correspond to any Sekoia rules, so shipping them creates dangling references. |
+| `datasources`         | Sekoia expects a list of tenant-registered data-source **UUIDs**, not the free-form Sigma `logsource` dict. Can't derive UUIDs from `{product, category}` without tenant-specific context. Sigma `logsource` remains visible via the payload YAML. |
 
 ## Severity mapping — Sigma `level` → Sekoia `severity`
 
