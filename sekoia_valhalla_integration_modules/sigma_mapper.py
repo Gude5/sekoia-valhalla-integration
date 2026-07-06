@@ -28,6 +28,7 @@ DEFAULT_EFFORT = 2
 # 100 characters. Truncate defensively and mark truncation with a single-char
 # Unicode ellipsis so operators can still recognise the rule.
 MAX_NAME_LENGTH = 100
+MAX_DESCRIPTION_LENGTH = 1000
 _TRUNCATION_MARKER = "…"
 
 # Tier 1: clean 1:1 mappings from raw SigmaHQ field names to Elastic Common
@@ -400,6 +401,11 @@ def sigma_rule_to_catalog_payload(
         title = title[: MAX_NAME_LENGTH - len(_TRUNCATION_MARKER)] + _TRUNCATION_MARKER
 
     description = parsed.get("description") or rule.get("description") or ""
+    if len(description) > MAX_DESCRIPTION_LENGTH:
+        description = (
+            description[: MAX_DESCRIPTION_LENGTH - len(_TRUNCATION_MARKER)]
+            + _TRUNCATION_MARKER
+        )
 
     level = (parsed.get("level") or rule.get("level") or "").lower()
     severity = SEVERITY_MAP.get(level, DEFAULT_SEVERITY)

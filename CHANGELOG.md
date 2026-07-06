@@ -46,6 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dry-run-only, no API calls.
 
 ### Fixed
+- `description` is truncated to Sekoia's 1000-character API limit before
+  POSTing. Rules whose Sigma description exceeds 1000 chars (a small tail
+  — one rule against the full Valhalla feed) were previously rejected
+  with `HTTP 400 VA301 String should have at most 1000 characters`; they
+  are now truncated with a `…` suffix, mirroring the existing 100-char
+  `name` truncation.
 - `community_uuid` is no longer sent in the Rules Catalog POST body.
   Setting it in combination with other metadata fields (`tags`,
   `description`, `false_positives`) triggered Sekoia's AU202 scope
