@@ -34,10 +34,10 @@
       "min_sigma_status": {
         "type": "string",
         "title": "Minimum Sigma status",
-        "description": "Only rules with a Sigma `status` at least this mature are imported (ordering: unsupported < deprecated < experimental < test < stable). Rules missing the `status` field are always skipped.",
-        "enum": ["unsupported", "deprecated", "experimental", "test", "stable"],
-        "enumNames": ["unsupported", "deprecated", "experimental", "test", "stable"],
-        "default": "unsupported"
+        "description": "Only rules with a Sigma `status` at least this mature are imported (ordering: experimental < test < stable). Rules with status `deprecated` or `unsupported` are never imported. Rules missing the `status` field are always skipped.",
+        "enum": ["experimental", "test", "stable"],
+        "enumNames": ["experimental", "test", "stable"],
+        "default": "experimental"
       }
     },
     "required": ["alert_type_uuid"]

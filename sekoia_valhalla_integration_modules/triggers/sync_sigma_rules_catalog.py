@@ -20,7 +20,7 @@ from sekoia_valhalla_integration_modules.sigma_mapper import (
 UUID_MAP_FILE = "valhalla-sigma-catalog-uuid-map.json"
 TOP_UNMAPPED_REPORT = 20
 DEFAULT_MIN_LEVEL = "informational"
-DEFAULT_MIN_STATUS = "unsupported"
+DEFAULT_MIN_STATUS = "experimental"
 
 
 class SyncSigmaRulesCatalog(Trigger):

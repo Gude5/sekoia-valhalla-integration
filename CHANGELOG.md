@@ -35,13 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`observed_tags`).
 - `sync-sigma-rules-catalog` trigger gained two dropdown configs:
   `min_sigma_level` (default `informational`) and `min_sigma_status`
-  (default `unsupported`). Rules whose Sigma `level` is below the
+  (default `experimental`). Rules whose Sigma `level` is below the
   configured minimum (order: informational < low < medium < high <
   critical) or whose `status` is below the configured minimum (order:
-  unsupported < deprecated < experimental < test < stable) are skipped.
-  Rules **missing** either the `level` or `status` field are now
-  always skipped, regardless of the thresholds. Filter hits are counted
-  in the new `skipped_filter` counter on the summary event.
+  experimental < test < stable) are skipped. Sigma statuses
+  `deprecated` and `unsupported` are not selectable in the UI and are
+  never imported. Rules **missing** either the `level` or `status`
+  field are always skipped, regardless of the thresholds. Filter hits
+  are counted in the new `skipped_filter` counter on the summary event.
 - `delete-catalog-rules` trigger's zero-match diagnostic now also logs
   the sample rule's field key set and a truncated JSON dump of the first
   rule. This exposes what fields the list endpoint actually returns, so
