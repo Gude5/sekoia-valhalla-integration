@@ -12,10 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   body. Sigma's `related[].id` values are Sigma-world UUIDs that don't
   correspond to any rule in the Sekoia tenant, so shipping them just
   created dangling references. Same reasoning as `community_uuid`.
-- `min_sigma_level` and `min_sigma_status` dropdown options are now
-  declared with explicit `oneOf` const+title entries so the Sekoia UI
-  displays them in lowercase (matching the underlying enum values)
-  instead of auto-capitalising them.
+- `min_sigma_level` and `min_sigma_status` are declared with plain
+  `enum` (so Sekoia's form renderer displays them as dropdowns) plus
+  `enumNames` mirroring the enum values so renderers that honour the
+  react-jsonschema-form convention display the lowercase labels
+  literally. Reverts an earlier `oneOf`-based experiment that gave
+  correct labels but broke the dropdown rendering.
 
 ### Added
 - `sync-sigma-rules-catalog` trigger now attaches a marker tag
