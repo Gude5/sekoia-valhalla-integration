@@ -46,6 +46,33 @@ _TRUNCATION_MARKER = "…"
 # Stable across Sekoia API-key rotations (unlike ``created_by``).
 MARKER_TAG = "valhalla-integration"
 
+# Sekoia alert-type UUIDs are stable across tenants (Ecsirt-standard
+# taxonomy). We derive an ``alert_type_uuid`` per rule from its Sigma
+# MITRE tactic tags rather than requiring a user-supplied config value.
+DEFAULT_ALERT_UUID = "599f4b1a-dd60-43fe-8ee9-07d3c5d00ded"  # application-compromise
+
+# Priority-ordered list: first matching tag wins. Later kill-chain
+# stages beat earlier ones; specific detections (c&c, exfiltration)
+# beat generic categories.
+TAG_TO_ALERT_UUID: tuple[tuple[str, str], ...] = (
+    ("attack.exfiltration",        "0b7c0b5b-da8e-4e43-a2e1-11cb5a40f168"),  # exfiltration
+    ("attack.command-and-control", "47e51ab7-4caa-4c4b-8442-a1caf868806d"),  # c&c
+    ("attack.persistence",         "5928d144-2038-4a87-b996-b3585a9a1a41"),  # backdoor
+    ("attack.initial-access",      "4321cd89-89d6-4674-9e99-690ce0e61621"),  # exploit
+    ("attack.discovery",           "38305ebd-cec9-47ff-b38b-d20bd22eb79d"),  # appscan
+    ("attack.reconnaissance",      "38305ebd-cec9-47ff-b38b-d20bd22eb79d"),  # appscan
+)
+
+
+def derive_alert_type_uuid(tags: list) -> str:
+    """Return the highest-priority alert_type_uuid the Sigma tags map
+    to, or ``DEFAULT_ALERT_UUID`` if no tactic tag matches."""
+    tag_set = {t.lower() for t in tags if isinstance(t, str)}
+    for tag, uuid in TAG_TO_ALERT_UUID:
+        if tag in tag_set:
+            return uuid
+    return DEFAULT_ALERT_UUID
+
 # Tier 1: clean 1:1 mappings from raw SigmaHQ field names to Elastic Common
 # Schema. Covers the ~34 most-frequent Windows/network/web fields in the
 # Valhalla feed. Extended in Stage 2 with context-aware branches for
@@ -390,7 +417,6 @@ def convert_payload_to_ecs(
 def sigma_rule_to_catalog_payload(
     rule: dict,
     parsed: dict,
-    alert_type_uuid: str,
     enabled: bool,
 ) -> dict:
     """Build the Sekoia Rules Catalog POST body.
@@ -399,6 +425,9 @@ def sigma_rule_to_catalog_payload(
     from the parsed Sigma rule dict into structured Sekoia fields. The
     ``payload`` is only the ECS-converted ``detection:`` block,
     YAML-serialised with the ``detection:`` keyword preserved.
+
+    ``alert_type_uuid`` is auto-derived from the rule's Sigma tags via
+    ``derive_alert_type_uuid`` — no user config needed.
 
     Optional Sekoia fields (``tags``, ``false_positives``) are included
     only when the source Sigma rule actually carries the corresponding
@@ -438,6 +467,13 @@ def sigma_rule_to_catalog_payload(
         detection_only, sort_keys=False, allow_unicode=True
     )
 
+    # Always attach the integration marker tag so the delete trigger can
+    # identify our rules independently of the Sekoia API key that created
+    # them (``created_by`` changes on key rotation; a tag does not).
+    tags = list(parsed.get("tags") or [])
+    if MARKER_TAG not in tags:
+        tags.append(MARKER_TAG)
+
     body: dict = {
         "name": title,
         "type": "sigma",
@@ -445,19 +481,12 @@ def sigma_rule_to_catalog_payload(
         "payload": payload_yaml,
         "severity": severity,
         "effort": effort,
-        "alert_type_uuid": alert_type_uuid,
+        "alert_type_uuid": derive_alert_type_uuid(tags),
         "enabled": enabled,
     }
 
     # Optional fields — include only when the Sigma rule actually has them.
     # community_uuid is deliberately not shipped (see docstring).
-
-    # Always attach the integration marker tag so the delete trigger can
-    # identify our rules independently of the Sekoia API key that created
-    # them (``created_by`` changes on key rotation; a tag does not).
-    tags = list(parsed.get("tags") or [])
-    if MARKER_TAG not in tags:
-        tags.append(MARKER_TAG)
     body["tags"] = tags
 
     # Sekoia's `datasources` is a list of registered data-source UUIDs in the

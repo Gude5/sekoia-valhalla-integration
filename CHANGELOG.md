@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Changed
+- **Breaking**: `alert_type_uuid` config field is removed from the
+  `sync-sigma-rules-catalog` trigger. Each rule's `alert_type_uuid` is
+  now auto-derived from the rule's Sigma MITRE tactic tags via a
+  priority-ordered map (`attack.exfiltration` → `exfiltration`,
+  `attack.command-and-control` → `c&c`, `attack.persistence` →
+  `backdoor`, `attack.initial-access` → `exploit`, `attack.discovery` /
+  `attack.reconnaissance` → `appscan`, everything else →
+  `application-compromise`). UUIDs are hardcoded (the Sekoia Ecsirt
+  taxonomy uses stable UUIDs across tenants). No user configuration
+  needed; playbooks that previously set `alert_type_uuid` silently
+  ignore the value on redeploy.
 - `related_object_refs` is no longer sent in the Rules Catalog POST
   body. Sigma's `related[].id` values are Sigma-world UUIDs that don't
   correspond to any rule in the Sekoia tenant, so shipping them just

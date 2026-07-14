@@ -12,11 +12,6 @@
         "default": 86400,
         "minimum": 3600
       },
-      "alert_type_uuid": {
-        "type": "string",
-        "title": "Alert type UUID",
-        "description": "Sekoia alert taxonomy UUID. Fetch from GET /v1/sic/conf/alerts/types."
-      },
       "enabled": {
         "type": "boolean",
         "title": "Enable rules on push",
@@ -40,7 +35,7 @@
         "default": "experimental"
       }
     },
-    "required": ["alert_type_uuid"]
+    "required": []
   },
   "results": {
     "type": "object",

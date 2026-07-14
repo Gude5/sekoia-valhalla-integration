@@ -20,7 +20,7 @@ Implementation: [`sigma_rule_to_catalog_payload()`](../sekoia_valhalla_integrati
 | `payload`          | Sigma `detection:` block           | Only the detection block, YAML-serialised with the `detection:` keyword preserved. Field names ECS-converted.  |
 | `severity`         | Sigma `level`                      | See severity mapping below. Missing → `0`.                                                                     |
 | `effort`           | Sigma `status`                     | See effort mapping below. Missing → `2` (test).                                                                |
-| `alert_type_uuid`  | trigger config                     | Not derived from Sigma — supplied via the sync trigger's `alert_type_uuid` argument.                           |
+| `alert_type_uuid`  | Sigma `tags` (MITRE tactic)        | Auto-derived from the rule's Sigma tags via a priority-ordered map. See "Alert type derivation" below. No user config needed. |
 | `enabled`          | trigger config                     | Defaults to `false` — rules opt-in in the Sekoia UI.                                                           |
 
 ## Marker tag
@@ -70,3 +70,35 @@ Defined in `SEVERITY_MAP` / `DEFAULT_SEVERITY`.
 | _(missing)_     | 2               |
 
 Defined in `STATUS_TO_EFFORT` / `DEFAULT_EFFORT`.
+
+## Alert type derivation — Sigma `tags` → Sekoia `alert_type_uuid`
+
+Sekoia's alert-type UUIDs are drawn from the Ecsirt-standard taxonomy
+and are stable across tenants, so we hardcode them. Each rule's
+`alert_type_uuid` is chosen from its Sigma MITRE tactic tags using a
+priority-ordered map. Top row wins when a rule carries multiple tags.
+
+| Sigma tag                     | Sekoia value           | UUID                                     |
+|-------------------------------|------------------------|------------------------------------------|
+| `attack.exfiltration`         | `exfiltration`         | `0b7c0b5b-da8e-4e43-a2e1-11cb5a40f168`   |
+| `attack.command-and-control`  | `c&c`                  | `47e51ab7-4caa-4c4b-8442-a1caf868806d`   |
+| `attack.persistence`          | `backdoor`             | `5928d144-2038-4a87-b996-b3585a9a1a41`   |
+| `attack.initial-access`       | `exploit`              | `4321cd89-89d6-4674-9e99-690ce0e61621`   |
+| `attack.discovery`            | `appscan`              | `38305ebd-cec9-47ff-b38b-d20bd22eb79d`   |
+| `attack.reconnaissance`       | `appscan`              | `38305ebd-cec9-47ff-b38b-d20bd22eb79d`   |
+| _(any other tag / no tag)_    | `application-compromise` | `599f4b1a-dd60-43fe-8ee9-07d3c5d00ded` |
+
+Defined in `TAG_TO_ALERT_UUID` / `DEFAULT_ALERT_UUID` /
+`derive_alert_type_uuid()`.
+
+Why some Sigma tactics fall through to the default:
+- `attack.impact` — Sekoia has four impact-adjacent values (`ddos`,
+  `dos`, `sabotage`, `defacement`); the `impact` tactic alone doesn't
+  disambiguate.
+- `attack.credential-access`, `attack.execution`,
+  `attack.privilege-escalation`, `attack.defense-evasion`,
+  `attack.lateral-movement`, `attack.collection`,
+  `attack.resource-development` — no obvious 1:1 Sekoia value; the
+  generic `application-compromise` bucket is a safe catch-all.
+- CVE tags (`cve.*`) — usually co-occur with `attack.initial-access`
+  or `attack.execution`, so relying on the tactic tag is enough.

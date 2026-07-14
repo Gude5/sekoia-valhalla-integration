@@ -28,7 +28,6 @@ class SyncSigmaRulesCatalog(Trigger):
         cfg = self.module.configuration
         self._valhalla = ValhallaClient(cfg.api_key)
         self._sekoia = SekoiaClient(cfg.sekoia_base_url, cfg.sekoia_api_key)
-        self._alert_type_uuid = self.configuration["alert_type_uuid"]
         self._enabled = self.configuration.get("enabled", False)
         min_level = self.configuration.get("min_sigma_level", DEFAULT_MIN_LEVEL)
         min_status = self.configuration.get("min_sigma_status", DEFAULT_MIN_STATUS)
@@ -94,7 +93,6 @@ class SyncSigmaRulesCatalog(Trigger):
                     body = sigma_rule_to_catalog_payload(
                         rule,
                         parsed,
-                        self._alert_type_uuid,
                         self._enabled,
                     )
                     try:
