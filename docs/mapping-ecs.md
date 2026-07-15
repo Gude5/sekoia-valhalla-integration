@@ -8,167 +8,65 @@ Before POSTing a rule, the sync trigger walks every key in the
 
 Rules that reference any field NOT in the mapping (or a Stage-2 branch)
 are skipped — their unmapped field names roll up into the
-`top_unmapped` histogram on the sync summary event. Current yield
-against the Valhalla demo feed: **2961 / 3591 = 82.5%**.
+`top_unmapped` histogram on the sync summary event.
 
-Implementation: [`convert_payload_to_ecs()`](../sekoia_valhalla_integration_modules/sigma_mapper.py) in `sigma_mapper.py`. Sigma
-field modifiers (`|contains`, `|endswith`, `|re`, `|base64offset`, and
-chained combinations) are preserved on the ECS-renamed field.
+Implementation: [`convert_payload_to_ecs()`](../sekoia_valhalla_integration_modules/sigma_mapper.py)
+in `sigma_mapper.py`. Sigma field modifiers (`|contains`, `|endswith`,
+`|re`, `|base64offset`, chained combinations) are preserved on the
+ECS-renamed field.
 
-## Tier 1: direct 1:1 mappings
+## Provenance
 
-Defined in `RAW_TO_ECS`. Groupings mirror the source comments in the file.
+The mapping is split into five source dicts. Precedence highest-first:
 
-### Process
+| # | Dict                              | Source                                                                                                | Entries |
+|---|-----------------------------------|-------------------------------------------------------------------------------------------------------|---------|
+| 1 | `RAW_TO_ECS_SIGMAHQ_WINDOWS`      | [SigmaHQ pySigma-backend-elasticsearch `windows.py`](https://github.com/SigmaHQ/pySigma-backend-elasticsearch/blob/main/sigma/pipelines/elasticsearch/windows.py) static `field_mappings` block | 72      |
+| 2 | `RAW_TO_ECS_CUSTOM`               | Bespoke — fields SigmaHQ doesn't cover (AWS CloudTrail, Azure logs, Linux auditd, Windows Security event_data, IIS/W3C ELF cs-*, Google Workspace, Kubernetes dotted paths, `TargetImage`, `Signature`, etc.) | 68      |
+| 3 | `RAW_TO_ECS_SIGMAHQ_MACOS`        | [SigmaHQ `macos.py`](https://github.com/SigmaHQ/pySigma-backend-elasticsearch/blob/main/sigma/pipelines/elasticsearch/macos.py) `field_mappings` (ESF)                                            | 46      |
+| 4 | `RAW_TO_ECS_SIGMAHQ_ZEEK`         | [SigmaHQ `zeek.py`](https://github.com/SigmaHQ/pySigma-backend-elasticsearch/blob/main/sigma/pipelines/elasticsearch/zeek.py) `ecs_zeek_beats()` pipeline (Filebeat ≥ 7.6.1) | 405     |
+| 5 | `RAW_TO_ECS_SIGMAHQ_KUBERNETES`   | [SigmaHQ `kubernetes.py`](https://github.com/SigmaHQ/pySigma-backend-elasticsearch/blob/main/sigma/pipelines/elasticsearch/kubernetes.py) audit-log pipeline                                    | 9       |
 
-| SigmaHQ            | ECS                                |
-| ------------------ | ---------------------------------- |
-| `Image`            | `process.executable`               |
-| `CommandLine`      | `process.command_line`             |
-| `OriginalFileName` | `process.pe.original_file_name`    |
-| `ParentImage`      | `process.parent.executable`        |
-| `ParentCommandLine`| `process.parent.command_line`      |
-| `ProcessName`      | `process.name`                     |
-| `CurrentDirectory` | `process.working_directory`        |
-| `IntegrityLevel`   | `process.integrity_level`          |
-| `User`             | `user.name`                        |
-| `SourceImage`      | `process.executable`               |
-| `TargetImage`      | `process.executable`               |
+Merged into the runtime `RAW_TO_ECS` (**579** entries) via
+`setdefault` — the first dict to define a source field wins. Windows
+wins over macOS/Zeek on shared names because Valhalla's feed is
+majority Windows. Custom sits between Windows and the rest so we can
+override macOS-specific targets for fields that Windows uses too
+(e.g. `TargetImage` — macOS pipeline maps to `target.process.executable`;
+CUSTOM keeps it at `process.executable` for Windows Sigma rules).
 
-### Users
+### `.caseless` sub-fields
 
-| SigmaHQ          | ECS                |
-| ---------------- | ------------------ |
-| `TargetUserName` | `user.target.name` |
-| `SubjectUserName`| `user.name`        |
+SigmaHQ's Windows and macOS pipelines target `.caseless` multi-fields
+(e.g. `process.executable.caseless`) for case-insensitive matches.
+Sekoia's ECS schema doesn't expose those sub-fields, so the merge
+strips the suffix and ships the base field
+(`process.executable`). This is a deliberate departure — see
+`_strip_caseless()`. If Sekoia ever adds `.caseless` support, remove
+the strip.
 
-### Event metadata
+### Zeek scope
 
-| SigmaHQ         | ECS                    |
-| --------------- | ---------------------- |
-| `EventID`       | `event.code`           |
-| `Provider_Name` | `winlog.provider_name` |
-| `EventLog`      | `winlog.channel`       |
+Only the **`ecs_zeek_beats`** variant is adopted (Filebeat ≥ 7.6.1).
+The Corelight and raw-JSON variants are skipped. During extraction:
 
-### Files / DLLs / pipes
+- Wildcard targets (containing `*`, e.g. `zeek.*.arg`) are dropped —
+  they're not usable as literal ECS field names.
+- List targets (e.g. `dst: [destination.address, destination.ip]`)
+  collapse to the last element, which is usually the more ECS-canonical
+  choice.
 
-| SigmaHQ          | ECS                       |
-| ---------------- | ------------------------- |
-| `TargetFilename` | `file.path`               |
-| `ImageLoaded`    | `dll.path`                |
-| `ImagePath`      | `process.executable`      |
-| `PipeName`       | `file.name`               |
+## Context-aware branches
 
-### PE metadata (Sysmon image_load)
+`CONTEXT_AWARE_FIELDS` is consulted **before** `RAW_TO_ECS`. Any field
+listed here bypasses the flat lookup and resolves via
+`logsource.category`. If the rule's category isn't listed for that
+field, the rule is treated as unmapped and skipped.
 
-| SigmaHQ       | ECS                    |
-| ------------- | ---------------------- |
-| `Description` | `file.pe.description`  |
-| `Product`     | `file.pe.product`      |
-| `Company`     | `file.pe.company`      |
-
-### PowerShell
-
-| SigmaHQ           | ECS                                     |
-| ----------------- | --------------------------------------- |
-| `ScriptBlockText` | `powershell.file.script_block_text`     |
-
-### Network / DNS
-
-| SigmaHQ               | ECS                    |
-| --------------------- | ---------------------- |
-| `DestinationIp`       | `destination.ip`       |
-| `DestinationPort`     | `destination.port`     |
-| `DestinationHostname` | `destination.domain`   |
-| `SourceIp`            | `source.ip`            |
-| `IpAddress`           | `source.ip`            |
-| `QueryName`           | `dns.question.name`    |
-| `query`               | `dns.question.name`    |
-| `Initiated`           | `network.direction`    |
-
-### Web / proxy — W3C ELF (server-side)
-
-| SigmaHQ        | ECS                          |
-| -------------- | ---------------------------- |
-| `cs-method`    | `http.request.method`        |
-| `cs-referer`   | `http.request.referrer`      |
-| `cs-uri-query` | `url.query`                  |
-| `cs-uri-stem`  | `url.path`                   |
-| `cs-uri`       | `url.original`               |
-| `sc-status`    | `http.response.status_code`  |
-| `userAgent`    | `user_agent.original`        |
-
-### Web / proxy — W3C ELF (client-side)
-
-| SigmaHQ       | ECS                    |
-| ------------- | ---------------------- |
-| `c-uri`       | `url.original`         |
-| `c-useragent` | `user_agent.original`  |
-
-### Services
-
-| SigmaHQ           | ECS                  |
-| ----------------- | -------------------- |
-| `ServiceName`     | `service.name`       |
-| `ServiceFileName` | `service.executable` |
-
-### Code signatures
-
-| SigmaHQ           | ECS                            |
-| ----------------- | ------------------------------ |
-| `Signed`          | `code_signature.signed`        |
-| `Signature`       | `code_signature.subject_name`  |
-| `SignatureStatus` | `code_signature.status`        |
-
-### Cloud events (AWS CloudTrail / Azure activity logs)
-
-| SigmaHQ               | ECS                                                    |
-| --------------------- | ------------------------------------------------------ |
-| `eventName`           | `event.action`                                         |
-| `eventSource`         | `event.provider`                                       |
-| `operationName`       | `event.action`                                         |
-| `errorCode`           | `aws.cloudtrail.error_code`                            |
-| `properties.message`  | `azure.activitylogs.properties.message`                |
-| `status`              | `event.outcome`                                        |
-| `riskEventType`       | `azure.signinlogs.properties.risk_event_type`          |
-
-### Linux auditd
-
-| SigmaHQ   | ECS                        |
-| --------- | -------------------------- |
-| `SYSCALL` | `auditd.data.syscall`      |
-| `type`    | `auditd.log.record_type`   |
-| `a0`      | `auditd.data.a0`           |
-| `a1`      | `auditd.data.a1`           |
-| `exe`     | `process.executable`       |
-| `cfgpath` | `auditd.data.cfgpath`      |
-
-### Windows Security event_data
-
-Sekoia accepts these as-is under the `winlog.event_data.*` namespace,
-preserving the original field name.
-
-| SigmaHQ         | ECS                              |
-| --------------- | -------------------------------- |
-| `ObjectClass`   | `winlog.event_data.ObjectClass`  |
-| `ObjectDN`      | `winlog.event_data.ObjectDN`     |
-| `Details`       | `winlog.event_data.Details`      |
-| `LogonType`     | `winlog.event_data.LogonType`    |
-| `GrantedAccess` | `winlog.event_data.GrantedAccess`|
-| `CallTrace`     | `winlog.event_data.CallTrace`    |
-| `InterfaceUuid` | `winlog.event_data.InterfaceUuid`|
-
-## Tier 2: context-aware branches
-
-### `TargetObject` — resolves by `logsource.category`
-
-Sigma's convention: registry-family categories treat `TargetObject` as
-the registry key path; `file_event` uses it as a file path (rare).
-Rules with any other logsource category are **skipped** (`TargetObject`
-returns `None` from `_resolve_field`).
+### `TargetObject` — bespoke (Sigma convention)
 
 | `logsource.category` | ECS field       |
-| -------------------- | --------------- |
+|----------------------|-----------------|
 | `registry_set`       | `registry.path` |
 | `registry_add`       | `registry.path` |
 | `registry_delete`    | `registry.path` |
@@ -176,7 +74,28 @@ returns `None` from `_resolve_field`).
 | `registry_event`     | `registry.path` |
 | `file_event`         | `file.path`     |
 
-Defined in `TARGET_OBJECT_BY_CATEGORY`.
+### PE metadata — SigmaHQ `ecs_windows_variable_mappings`
+
+SigmaHQ routes these fields differently depending on whether the rule
+is a process_creation (target = executing process) vs. image_load
+(target = the DLL/file being loaded).
+
+| Sigma field         | `process_creation`               | `image_load`                     | Other        |
+|---------------------|----------------------------------|----------------------------------|--------------|
+| `Description`       | `process.pe.description`         | `file.pe.description`            | `sysmon_error` → `winlog.event_data.Description` |
+| `Product`           | `process.pe.product`             | `file.pe.product`                | —            |
+| `Company`           | `process.pe.company`             | `file.pe.company`                | —            |
+| `OriginalFileName`  | `process.pe.original_file_name`  | `file.pe.original_file_name`     | —            |
+| `FileVersion`       | `process.pe.file_version`        | `file.pe.file_version`           | —            |
+
+### Network — SigmaHQ
+
+| Sigma field | `logsource.category`  | ECS field           |
+|-------------|-----------------------|---------------------|
+| `Initiated` | `network_connection`  | `network.direction` |
+| `Protocol`  | `network_connection`  | `network.transport` |
+
+## Value transforms
 
 ### `Hashes` — value split by algorithm
 
@@ -185,7 +104,7 @@ Sigma stores hashes as `ALGO=DIGEST` in a single field
 into per-algorithm ECS keys:
 
 | Detected algorithm (`ALGO=…`) | ECS field                |
-| ----------------------------- | ------------------------ |
+|-------------------------------|--------------------------|
 | `MD5`                         | `process.hash.md5`       |
 | `SHA1`                        | `process.hash.sha1`      |
 | `SHA256`                      | `process.hash.sha256`    |
@@ -201,25 +120,18 @@ Semantics:
 
 Recognised algorithms: `_HASH_ALGOS = {"md5", "sha1", "sha256", "sha512", "imphash"}`.
 
-## Fields that pass through untouched
-
-Set `_ECS_PASSTHROUGH_FIELDS`. Used so a Stage-2 transform emitting an
-already-ECS name doesn't re-trigger the mapping walk:
-
-- `process.hash.md5` / `.sha1` / `.sha256` / `.sha512` / `.imphash`
-- `registry.path`
-- `file.path`
-
-## Skipping behaviour
+## Skip semantics
 
 A rule is skipped when its `detection:` block contains **any** field
 that:
 
-- isn't a key in `RAW_TO_ECS`, AND
-- doesn't hit a Stage-2 branch (`TargetObject` with matched logsource,
-  or valid `Hashes` values), AND
-- isn't already in `_ECS_PASSTHROUGH_FIELDS`.
+- doesn't hit `CONTEXT_AWARE_FIELDS` (or hits it with a non-matching
+  category), AND
+- isn't already in `_ECS_PASSTHROUGH_FIELDS` (Stage 2 output shape),
+  AND
+- isn't a key in the merged `RAW_TO_ECS`.
 
-Every unmapped bare field name is aggregated into the
-`top_unmapped` histogram on the sync summary event. The 20 most-common
-values are surfaced so operators know which entries to add next.
+Every unmapped bare field name is aggregated into the `top_unmapped`
+histogram on the sync summary event. The 20 most-common values are
+surfaced so operators know which entries to add next (in `RAW_TO_ECS_CUSTOM`
+— never in the SigmaHQ dicts, which are read-only mirrors).

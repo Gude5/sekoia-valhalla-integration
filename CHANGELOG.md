@@ -7,7 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+- **RAW_TO_ECS_CUSTOM expanded from 32 to 68 entries**, targeting the
+  highest-count unmapped fields from the live-feed histogram. New
+  additions:
+  - **Windows Security event_data** (~22 fields → `winlog.event_data.*`):
+    `Data`, `ObjectName`, `ObjectType`, `RelativeTargetName`, `Status`,
+    `ShareName`, `AccessMask`, `OpNum`, `AccessList`, `NewValue`,
+    `AttributeLDAPDisplayName`, `AttributeValue`, `TaskName`, `Category`,
+    `Contents`, `Configuration`, `ContextInfo`, `AuthenticationPackageName`,
+    `ModifyingApplication`, `Level`, `Path`.
+  - **Auditd extras**: `a2`, `a3`, `a4` → `auditd.data.a{2,3,4}`.
+  - **Kubernetes dotted forms**: `objectRef.resource/namespace/name/apiGroup/subresource`
+    → `kubernetes.audit.objectRef.*` (rules often use the fully-qualified
+    dotted form directly).
+  - **Cloud**: `eventType`/`EventType`/`OperationName` → `event.action`;
+    `AuthenticationRequirement` and `ResultType` → Azure sign-in
+    properties; `auditType.action`/`auditType.category` → Google Workspace
+    event fields.
+- `_ECS_PASSTHROUGH_FIELDS` now includes `gcp.audit.method_name`
+  (and three related GCP audit fields) — Sigma rules that already write
+  these in ECS form pass through untouched.
+- `Signature` promoted from `CONTEXT_AWARE_FIELDS` to `RAW_TO_ECS_CUSTOM`
+  as a static mapping. SigmaHQ's pipeline gates it on `driver_loaded`/
+  `image_loaded` categories, but both variants map to the same ECS
+  target — collapsing to static preserves that behaviour and adds a
+  fallback for rules outside those categories.
+- Removed redundant `QueryName` from CUSTOM (already in SigmaHQ Windows).
+
 ### Changed
+- **ECS field mappings rebased on SigmaHQ pySigma-backend-elasticsearch
+  pipelines as source of truth.** The single `RAW_TO_ECS` dict is
+  replaced by five: `RAW_TO_ECS_SIGMAHQ_WINDOWS` (72 entries copied
+  verbatim from `windows.py`), `RAW_TO_ECS_SIGMAHQ_MACOS` (46 from
+  `macos.py`), `RAW_TO_ECS_SIGMAHQ_ZEEK` (405 from `zeek.py`'s
+  `ecs_zeek_beats()` variant), `RAW_TO_ECS_SIGMAHQ_KUBERNETES` (9 from
+  `kubernetes.py`), plus `RAW_TO_ECS_CUSTOM` (68 bespoke entries for
+  fields SigmaHQ doesn't cover — AWS CloudTrail, Azure logs, Linux
+  auditd, Windows Security event_data, IIS/W3C-ELF `cs-*`, Google
+  Workspace, Kubernetes dotted paths, `TargetImage`/`IntegrityLevel`/
+  `ServiceName`, `SubjectUserName`, `userAgent`, `Signature`). Merged
+  via `setdefault`: Windows first (majority-use Sigma product), CUSTOM
+  second (overrides macOS defaults for shared fields like `TargetImage`),
+  then macOS/Zeek/K8s to fill remaining gaps. Runtime map has 579
+  entries — up from ~90. Adopts SigmaHQ's
+  `.caseless` targets but strips the suffix at merge time since
+  Sekoia's ECS schema doesn't expose those sub-fields.
+- **Context-aware branch extended** from the previous single
+  `TARGET_OBJECT_BY_CATEGORY` to a general
+  `CONTEXT_AWARE_FIELDS: dict[str, dict[str, str]]`. Adds SigmaHQ's
+  Windows PE-metadata fields (`Description`, `Product`, `Company`,
+  `OriginalFileName`, `FileVersion` route to `process.pe.*` for
+  `process_creation` and `file.pe.*` for `image_load`), the
+  `sysmon_error` third-branch for `Description`, plus `Signature`
+  (driver/image loaded → `file.code_signature.subject_name`) and
+  `Initiated`/`Protocol` (network_connection only). `_resolve_field`
+  consults this dict before the flat map.
 - **Breaking**: `alert_type_uuid` config field is removed from the
   `sync-sigma-rules-catalog` trigger. Each rule's `alert_type_uuid` is
   now auto-derived from the rule's Sigma MITRE tactic tags via a
