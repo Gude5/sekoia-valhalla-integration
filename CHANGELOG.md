@@ -84,8 +84,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   react-jsonschema-form convention display the lowercase labels
   literally. Reverts an earlier `oneOf`-based experiment that gave
   correct labels but broke the dropdown rendering.
-
-### Added
 - `sync-sigma-rules-catalog` trigger now attaches a marker tag
   (`valhalla-integration`, exported as `sigma_mapper.MARKER_TAG`) to
   every rule it POSTs. The tag survives Sekoia API-key rotations and
