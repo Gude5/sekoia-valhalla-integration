@@ -14,7 +14,10 @@ SEVERITY_MAP = {
 DEFAULT_SEVERITY = 0
 
 # Sekoia ``effort`` is derived from Sigma's rule maturity (``status`` field).
-STATUS_TO_EFFORT = {
+# Lower effort = higher maturity. Also used by the sync trigger to filter
+# rules by minimum maturity: a rule passes when its effort is ``<=`` the
+# effort configured for ``min_sigma_status``.
+STATUS_EFFORT_MAP = {
     "stable": 1,
     "test": 2,
     "experimental": 3,
@@ -22,17 +25,7 @@ STATUS_TO_EFFORT = {
     "deprecated": 4,
 }
 # Returned when the Sigma rule has no ``status`` field.
-DEFAULT_EFFORT = 2
-
-# Ordinal ranks used by the sync trigger to filter rules by minimum
-# maturity. ``unsupported`` is the least mature, ``stable`` the most.
-STATUS_RANK = {
-    "unsupported": 1,
-    "deprecated": 2,
-    "experimental": 3,
-    "test": 4,
-    "stable": 5,
-}
+DEFAULT_EFFORT = 3
 
 # Sekoia Rules Catalog API rejects (HTTP 400 VA301) rule names longer than
 # 100 characters. Truncate defensively and mark truncation with a single-char
@@ -1130,7 +1123,7 @@ def sigma_rule_to_catalog_payload(
     severity = SEVERITY_MAP.get(level, DEFAULT_SEVERITY)
 
     status = (parsed.get("status") or "").lower()
-    effort = STATUS_TO_EFFORT.get(status, DEFAULT_EFFORT)
+    effort = STATUS_EFFORT_MAP.get(status, DEFAULT_EFFORT)
 
     # payload = only the detection block, YAML-serialised with the
     # ``detection:`` key so it round-trips back to the Sigma detection shape.

@@ -12,7 +12,7 @@ from sekoia_valhalla_integration_modules.sekoia_client import (
 )
 from sekoia_valhalla_integration_modules.sigma_mapper import (
     SEVERITY_MAP,
-    STATUS_RANK,
+    STATUS_EFFORT_MAP,
     convert_payload_to_ecs,
     sigma_rule_to_catalog_payload,
 )
@@ -32,7 +32,7 @@ class SyncSigmaRulesCatalog(Trigger):
         min_level = self.configuration.get("min_sigma_level", DEFAULT_MIN_LEVEL)
         min_status = self.configuration.get("min_sigma_status", DEFAULT_MIN_STATUS)
         self._min_severity = SEVERITY_MAP[min_level]
-        self._min_status_rank = STATUS_RANK[min_status]
+        self._max_status_effort = STATUS_EFFORT_MAP[min_status]
         frequency = self.configuration.get("frequency", 86400)
 
         self._sync_once()
@@ -54,12 +54,12 @@ class SyncSigmaRulesCatalog(Trigger):
         level = (parsed.get("level") or "").lower()
         status = (parsed.get("status") or "").lower()
         level_score = SEVERITY_MAP.get(level)
-        status_rank = STATUS_RANK.get(status)
-        if level_score is None or status_rank is None:
+        status_effort = STATUS_EFFORT_MAP.get(status)
+        if level_score is None or status_effort is None:
             return False
         return (
             level_score >= self._min_severity
-            and status_rank >= self._min_status_rank
+            and status_effort <= self._max_status_effort
         )
 
     def _sync_once(self):
@@ -69,7 +69,7 @@ class SyncSigmaRulesCatalog(Trigger):
             updated = 0
             failed = 0
             skipped_unmapped = 0
-            skipped_filter = 0
+            filtered_out = 0
             unmapped_field_counter: Counter[str] = Counter()
             first_failure_logged = False
             with PersistentJSON(UUID_MAP_FILE, self.data_path) as id_map:
@@ -80,7 +80,7 @@ class SyncSigmaRulesCatalog(Trigger):
 
                     content = rule.get("content", "")
                     if not self._rule_passes_filter(content):
-                        skipped_filter += 1
+                        filtered_out += 1
                         continue
 
                     parsed, unmapped = convert_payload_to_ecs(content)
@@ -132,7 +132,7 @@ class SyncSigmaRulesCatalog(Trigger):
             self.log(
                 f"Catalog sync: created={created} updated={updated} "
                 f"failed={failed} skipped_unmapped={skipped_unmapped} "
-                f"skipped_filter={skipped_filter} total_rules={len(rules)} "
+                f"filtered_out={filtered_out} total_rules={len(rules)} "
                 f"top_unmapped={top_unmapped}",
                 level="info",
             )
@@ -143,7 +143,7 @@ class SyncSigmaRulesCatalog(Trigger):
                     "updated": updated,
                     "failed": failed,
                     "skipped_unmapped": skipped_unmapped,
-                    "skipped_filter": skipped_filter,
+                    "skipped_filter": filtered_out,
                     "total_rules": len(rules),
                     "top_unmapped": top_unmapped,
                 },
