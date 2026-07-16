@@ -741,7 +741,7 @@ def test_windows_wins_shared_field_names_over_macos():
     and macOS pipelines with different targets. The merge order puts
     Windows first so Windows-appropriate ECS targets win — Valhalla's
     feed is majority Windows."""
-    from sekoia_valhalla_integration_modules.sigma_mapper import (
+    from sekoia_valhalla_integration_modules.ecs_field_maps import (
         RAW_TO_ECS_SIGMAHQ_MACOS,
         RAW_TO_ECS_SIGMAHQ_WINDOWS,
     )
@@ -754,7 +754,7 @@ def test_windows_wins_shared_field_names_over_macos():
 
 
 def test_custom_map_fills_gaps_windows_pipeline_doesnt_cover():
-    from sekoia_valhalla_integration_modules.sigma_mapper import (
+    from sekoia_valhalla_integration_modules.ecs_field_maps import (
         RAW_TO_ECS_CUSTOM,
         RAW_TO_ECS_SIGMAHQ_WINDOWS,
     )

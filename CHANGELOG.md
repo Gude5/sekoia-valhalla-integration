@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Tests / repo
+- **ECS field-mapping tables moved out of `sigma_mapper` into a new
+  `ecs_field_maps` module.** Split is data/logic: the four SigmaHQ
+  pipeline dicts (`RAW_TO_ECS_SIGMAHQ_WINDOWS/MACOS/ZEEK/KUBERNETES`),
+  `RAW_TO_ECS_CUSTOM`, the merge helpers (`_strip_caseless`,
+  `_merge_sigmahq`), the merged runtime `RAW_TO_ECS`,
+  `CONTEXT_AWARE_FIELDS`, and `_ECS_PASSTHROUGH_FIELDS` all live in
+  `ecs_field_maps.py`. `sigma_mapper.py` drops from ~1200 lines to
+  ~410 and keeps only the small constants (`SEVERITY_MAP`,
+  `STATUS_EFFORT_MAP`, `TAG_ALERT_UUID_MAP`, `MARKER_TAG`, size
+  limits) alongside the conversion functions. Test imports that
+  referenced the pipeline dicts by name now target
+  `ecs_field_maps` directly; `RAW_TO_ECS` remains reachable via
+  `sigma_mapper` as a re-export. No behavior change.
 - Added `test_updated_content_reaches_put_body` covering the update
   path end-to-end: sync #1 seeds the id-map, the rule's content changes
   on the feed, sync #2 must PUT the stored sekoia_uuid with a body that
