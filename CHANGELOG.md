@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Removed
+- **Breaking**: `sync-sigma-intelligence-center` trigger removed. The
+  Intelligence Center path never went beyond an initial experiment; the
+  Rules Catalog path (`sync-sigma-rules-catalog`) is the sole supported
+  destination for Valhalla Sigma rules. Playbooks that referenced the
+  removed trigger will fail to load on redeploy — migrate them to
+  `sync-sigma-rules-catalog`.
+- The supporting `sekoia_valhalla_integration_modules.stix` helper module
+  (STIX object construction, only used by the removed trigger) is
+  deleted along with its test file.
+
 ### Changed
 - **Sync trigger parses each rule's YAML once** (previously twice — once
   in `_rule_passes_filter`, once in `convert_payload_to_ecs`). Extracted
