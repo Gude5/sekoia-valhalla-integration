@@ -1,6 +1,8 @@
 from typing import Iterator, Optional
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 
 class SekoiaAPIError(RuntimeError):
@@ -27,12 +29,33 @@ class SekoiaClient:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
         self._timeout = timeout
-
-    def _headers(self) -> dict:
-        return {
-            "Authorization": f"Bearer {self._api_key}",
+        # One HTTP session across all requests — reuses the TCP + TLS
+        # handshake for the ~thousands of rule PUTs a full sync makes.
+        # Without pooling the trigger opens a fresh connection per rule
+        # and Sekoia's edge intermittently connect-times-out under that
+        # rate of new inbound connections from a single source IP.
+        self._session = requests.Session()
+        self._session.headers.update({
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
-        }
+        })
+        # Retry only transient transport-layer errors (connect/read
+        # timeouts, dropped connections). HTTP 4xx/5xx responses are
+        # deliberately NOT retried — the caller interprets 403/404 as
+        # "stale UUID, POST as new" and any other status should surface
+        # immediately to the sync trigger's per-rule failure counter.
+        retry = Retry(
+            total=2,
+            connect=2,
+            read=2,
+            status=0,
+            backoff_factor=1.0,  # 1s, 2s between retries
+            allowed_methods=frozenset(["GET", "POST", "PUT", "DELETE"]),
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        self._session.mount("https://", adapter)
+        self._session.mount("http://", adapter)
 
     @staticmethod
     def _ensure_ok(resp: requests.Response, method: str, url: str) -> None:
@@ -46,7 +69,7 @@ class SekoiaClient:
 
     def create_rule(self, body: dict) -> str:
         url = f"{self._base_url}/v1/sic/conf/rules-catalog/rules"
-        resp = requests.post(url, json=body, headers=self._headers(), timeout=self._timeout)
+        resp = self._session.post(url, json=body, timeout=self._timeout)
         self._ensure_ok(resp, "POST", url)
         try:
             data = resp.json()
@@ -64,7 +87,7 @@ class SekoiaClient:
 
     def update_rule(self, sekoia_uuid: str, body: dict) -> None:
         url = f"{self._base_url}/v1/sic/conf/rules-catalog/rules/{sekoia_uuid}"
-        resp = requests.put(url, json=body, headers=self._headers(), timeout=self._timeout)
+        resp = self._session.put(url, json=body, timeout=self._timeout)
         if resp.status_code in (403, 404):
             raise SekoiaRuleNotFoundError(
                 f"PUT {url} returned HTTP {resp.status_code}: {resp.text[:500]}",
@@ -76,7 +99,7 @@ class SekoiaClient:
         """DELETE a rule by uuid. 404 is treated as idempotent success (the
         rule was already gone in Sekoia)."""
         url = f"{self._base_url}/v1/sic/conf/rules-catalog/rules/{sekoia_uuid}"
-        resp = requests.delete(url, headers=self._headers(), timeout=self._timeout)
+        resp = self._session.delete(url, timeout=self._timeout)
         if resp.status_code == 404:
             return
         self._ensure_ok(resp, "DELETE", url)
@@ -100,8 +123,8 @@ class SekoiaClient:
             params: dict[str, object] = {"limit": page_size, "offset": offset}
             if match_field and match_value:
                 params[f"match[{match_field}]"] = match_value
-            resp = requests.get(
-                url, params=params, headers=self._headers(), timeout=self._timeout
+            resp = self._session.get(
+                url, params=params, timeout=self._timeout
             )
             self._ensure_ok(resp, "GET", url)
             try:

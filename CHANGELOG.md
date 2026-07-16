@@ -64,6 +64,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed redundant `QueryName` from CUSTOM (already in SigmaHQ Windows).
 
 ### Changed
+- **`SekoiaClient` now uses a `requests.Session` with a `urllib3.Retry`
+  policy** covering transient connect/read errors (2 retries, 1s + 2s
+  backoff). Previously every `create_rule` / `update_rule` /
+  `iter_rules` / `delete_rule` opened a fresh TCP + TLS connection —
+  a full sync (~3600 rules) triggered thousands of new inbound
+  connections from a single source IP, and Sekoia's edge intermittently
+  connect-timed-out under that rate. The pooled session reuses one
+  keep-alive connection across all rule calls. Retries are transport-
+  layer only: HTTP 4xx/5xx responses are returned as-is so
+  `SekoiaRuleNotFoundError` handling and per-rule failure counters
+  keep their existing semantics.
 - **ECS field-mapping tables moved out of `sigma_mapper` into a new
   `ecs_field_maps` module.** Split is data/logic: the four SigmaHQ
   pipeline dicts (`RAW_TO_ECS_SIGMAHQ_WINDOWS/MACOS/ZEEK/KUBERNETES`),
