@@ -82,6 +82,12 @@ _HASH_ALGOS: frozenset[str] = frozenset({"md5", "sha1", "sha256", "sha512", "imp
 # style names such as `cs-method`).
 _FIELD_KEY_RE = re.compile(r"^([A-Za-z0-9_.\-]+)((?:\|[a-z0-9_]+)*)$")
 
+# Sigma also allows bare-modifier keys inside a selection dict — used in
+# implicit-keyword blocks like ``keywords: {'|all': [foo, bar]}`` where the
+# ``|all`` modifier applies to the enclosing block's values, not to a named
+# field. We preserve these keys as-is.
+_BARE_MODIFIER_RE = re.compile(r"^((?:\|[a-z0-9_]+)+)$")
+
 # Keys under `detection:` that are not selection blocks and must not be walked.
 _NON_SELECTION_KEYS = frozenset({"condition", "timeframe"})
 
@@ -89,14 +95,20 @@ _NON_SELECTION_KEYS = frozenset({"condition", "timeframe"})
 def _split_field_key(key: str) -> tuple[str, str]:
     """Split ``"Field|mod1|mod2"`` into ``("Field", "|mod1|mod2")``.
 
+    Bare-modifier keys like ``"|all"`` (Sigma keyword-modifier construct
+    with no field name) return ``("", "|all")`` so the caller can preserve
+    the key unchanged.
+
     Returns the whole key as the field name and empty modifiers if the input
-    doesn't match the expected shape (defensive — unusual keys pass through
+    doesn't match either expected shape (defensive — unusual keys pass through
     unchanged so the caller can decide what to do).
     """
     m = _FIELD_KEY_RE.match(key)
-    if not m:
-        return key, ""
-    return m.group(1), m.group(2) or ""
+    if m:
+        return m.group(1), m.group(2) or ""
+    if _BARE_MODIFIER_RE.match(key):
+        return "", key
+    return key, ""
 
 
 def _resolve_field(
@@ -233,6 +245,13 @@ def _convert_selection(
         for k, v in transformed.items():
             if isinstance(k, str):
                 bare, mods = _split_field_key(k)
+                if not bare:
+                    # Bare-modifier key like ``|all`` — Sigma keyword-
+                    # modifier construct with no field name. Preserve.
+                    new_dict[k] = _convert_selection(
+                        v, mapping, unmapped, logsource_category
+                    )
+                    continue
                 mapped = _resolve_field(bare, mapping, logsource_category)
                 if mapped is None:
                     unmapped.append(bare)

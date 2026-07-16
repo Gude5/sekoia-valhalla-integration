@@ -19,6 +19,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deleted along with its test file.
 
 ### Added
+- **~50 additional Valhalla rules now convert successfully** (feed-wide
+  mapped count 3300 → 3350; skipped-for-unmapped-field 290 → 240) via
+  three groups of targeted fixes:
+  - **Sigma bare-modifier keys** (e.g. ``keywords: {'|all': [...]}``)
+    are now preserved as-is instead of being flagged as unmapped
+    fields. The field-key splitter recognises a second shape
+    (bare-modifier only, no field name) and the selection walker keeps
+    such keys untouched. Unblocks 16 CVE-exploit rules whose keyword
+    blocks used the Sigma AND-of-substrings idiom.
+  - **12 Windows Security event_data extensions** added to
+    ``RAW_TO_ECS_CUSTOM`` under the ``winlog.event_data.*`` passthrough
+    pattern already used for 22 existing fields: ``FilterName``,
+    ``LogonId``, ``LogonProcessName``, ``ObjectServer``,
+    ``ObjectValueName``, ``PrivilegeList``, ``SamAccountName``,
+    ``SourceName``, ``SubjectUserSid``, ``TargetName``, ``TaskContent``,
+    ``TicketEncryptionType``. Unblocks ~30 rules in the
+    ``windows/-/security`` and ``windows/-/windefend`` logsources.
+  - **Two W3C ELF / Zeek variants**: ``cs-user-agent`` and
+    ``user_agent`` both map to ``user_agent.original`` (SigmaHQ's Zeek
+    pipeline covers only ``c-useragent`` / ``http_user_agent``).
+    Unblocks 9 IIS/proxy/Zeek-HTTP rules.
+  - (Considered and skipped: an OpenCanary ``logtype`` mapping (24
+    rules). Sekoia has no OpenCanary intake format in
+    ``SEKOIA-IO/intake-formats``, so any mapping we shipped would be
+    symbolic — POSTs succeed, rules never match. The ``path`` field for
+    ``zeek/-/smb_files`` (5 rules) was also skipped because the bare
+    name is context-ambiguous across logsources — same class of
+    limitation as ``type`` and ``status`` noted in PLAN.md.)
 - Test `test_updated_content_reaches_put_body` covering the update
   path end-to-end: sync #1 seeds the id-map, the rule's content changes
   on the feed, sync #2 must PUT the stored sekoia_uuid with a body that

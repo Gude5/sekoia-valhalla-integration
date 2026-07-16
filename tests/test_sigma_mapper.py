@@ -481,8 +481,22 @@ def _single_field_rule(field: str, value: str = "'foo'") -> str:
         ("CallTrace", "winlog.event_data.CallTrace"),
         ("InterfaceUuid", "winlog.event_data.InterfaceUuid"),
         ("IsatapRouter", "winlog.event_data.IsatapRouter"),
-        # Custom W3C ELF variant
+        ("FilterName", "winlog.event_data.FilterName"),
+        ("LogonId", "winlog.event_data.LogonId"),
+        ("LogonProcessName", "winlog.event_data.LogonProcessName"),
+        ("ObjectServer", "winlog.event_data.ObjectServer"),
+        ("ObjectValueName", "winlog.event_data.ObjectValueName"),
+        ("PrivilegeList", "winlog.event_data.PrivilegeList"),
+        ("SamAccountName", "winlog.event_data.SamAccountName"),
+        ("SourceName", "winlog.event_data.SourceName"),
+        ("SubjectUserSid", "winlog.event_data.SubjectUserSid"),
+        ("TargetName", "winlog.event_data.TargetName"),
+        ("TaskContent", "winlog.event_data.TaskContent"),
+        ("TicketEncryptionType", "winlog.event_data.TicketEncryptionType"),
+        # Custom W3C ELF variants
         ("userAgent", "user_agent.original"),
+        ("cs-user-agent", "user_agent.original"),
+        ("user_agent", "user_agent.original"),
         # macOS (SigningID unique to pySigma macos pipeline)
         ("SigningID", "process.code_signature.signing_id"),
         ("PtraceRequest", "ptrace.request"),
@@ -1067,6 +1081,27 @@ def test_hashes_malformed_value_is_unmapped():
     converted, unmapped = convert_payload_to_ecs(payload)
     assert converted is None
     assert "Hashes" in unmapped
+
+
+def test_bare_all_modifier_in_keywords_block_is_preserved():
+    """Sigma keyword-modifier construct: ``keywords: {'|all': [...]}``
+    means AND-match all listed substrings against the raw event. The
+    ``|all`` key has no field name and must pass through unchanged, not
+    be flagged as an unmapped field."""
+    payload = textwrap.dedent(
+        """\
+        title: T
+        detection:
+          condition: keywords
+          keywords:
+            '|all':
+              - foo
+              - bar
+        """
+    )
+    converted, unmapped = convert_payload_to_ecs(payload)
+    assert unmapped == []
+    assert converted["detection"]["keywords"] == {"|all": ["foo", "bar"]}
 
 
 def test_hashes_bare_field_no_modifier_still_splits():

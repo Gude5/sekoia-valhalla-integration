@@ -632,23 +632,35 @@ RAW_TO_ECS_CUSTOM: dict[str, str] = {
     "ContextInfo": "winlog.event_data.ContextInfo",
     "Data": "winlog.event_data.Data",
     "Details": "winlog.event_data.Details",
+    "FilterName": "winlog.event_data.FilterName",
     "GrantedAccess": "winlog.event_data.GrantedAccess",
     "InterfaceUuid": "winlog.event_data.InterfaceUuid",
     "IsatapRouter": "winlog.event_data.IsatapRouter",
     "Level": "winlog.event_data.Level",
+    "LogonId": "winlog.event_data.LogonId",
+    "LogonProcessName": "winlog.event_data.LogonProcessName",
     "LogonType": "winlog.event_data.LogonType",
     "ModifyingApplication": "winlog.event_data.ModifyingApplication",
     "NewValue": "winlog.event_data.NewValue",
     "ObjectClass": "winlog.event_data.ObjectClass",
     "ObjectDN": "winlog.event_data.ObjectDN",
     "ObjectName": "winlog.event_data.ObjectName",
+    "ObjectServer": "winlog.event_data.ObjectServer",
     "ObjectType": "winlog.event_data.ObjectType",
+    "ObjectValueName": "winlog.event_data.ObjectValueName",
     "OpNum": "winlog.event_data.OpNum",
     "Path": "winlog.event_data.Path",
+    "PrivilegeList": "winlog.event_data.PrivilegeList",
     "RelativeTargetName": "winlog.event_data.RelativeTargetName",
+    "SamAccountName": "winlog.event_data.SamAccountName",
     "ShareName": "winlog.event_data.ShareName",
+    "SourceName": "winlog.event_data.SourceName",
     "Status": "winlog.event_data.Status",
+    "SubjectUserSid": "winlog.event_data.SubjectUserSid",
+    "TargetName": "winlog.event_data.TargetName",
+    "TaskContent": "winlog.event_data.TaskContent",
     "TaskName": "winlog.event_data.TaskName",
+    "TicketEncryptionType": "winlog.event_data.TicketEncryptionType",
     # Users (Sigma canonical → ECS user.*)
     "SubjectUserName": "user.name",
     "TargetUserName": "user.target.name",
@@ -673,6 +685,13 @@ RAW_TO_ECS_CUSTOM: dict[str, str] = {
     # W3C ELF variant (server-side ``userAgent`` camelCase — not
     # covered by Zeek, which uses ``http_user_agent``/``c-useragent``).
     "userAgent": "user_agent.original",
+    # ``cs-user-agent`` is the hyphenated W3C ELF form used in some
+    # IIS/proxy Sigma rules (e.g. exploit-webserver-* category); SigmaHQ
+    # Zeek maps only the abbreviated ``c-useragent``.
+    "cs-user-agent": "user_agent.original",
+    # ``user_agent`` (bare) shows up in Zeek HTTP Sigma rules; SigmaHQ
+    # Zeek maps the equivalent ``http_user_agent`` but not this variant.
+    "user_agent": "user_agent.original",
     # Kubernetes audit — dotted forms as they appear in Sigma rules.
     # SigmaHQ's pipeline maps the bare short names; some Sigma rules
     # use the fully-qualified `objectRef.*` path directly.
