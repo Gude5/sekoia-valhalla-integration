@@ -47,7 +47,7 @@ DEFAULT_ALERT_UUID = "599f4b1a-dd60-43fe-8ee9-07d3c5d00ded"  # application-compr
 # Priority-ordered list: first matching tag wins. Later kill-chain
 # stages beat earlier ones; specific detections (c&c, exfiltration)
 # beat generic categories.
-TAG_TO_ALERT_UUID: tuple[tuple[str, str], ...] = (
+TAG_ALERT_UUID_MAP: tuple[tuple[str, str], ...] = (
     ("attack.exfiltration",        "0b7c0b5b-da8e-4e43-a2e1-11cb5a40f168"),  # exfiltration
     ("attack.command-and-control", "47e51ab7-4caa-4c4b-8442-a1caf868806d"),  # c&c
     ("attack.persistence",         "5928d144-2038-4a87-b996-b3585a9a1a41"),  # backdoor
@@ -61,7 +61,7 @@ def derive_alert_type_uuid(tags: list) -> str:
     """Return the highest-priority alert_type_uuid the Sigma tags map
     to, or ``DEFAULT_ALERT_UUID`` if no tactic tag matches."""
     tag_set = {t.lower() for t in tags if isinstance(t, str)}
-    for tag, uuid in TAG_TO_ALERT_UUID:
+    for tag, uuid in TAG_ALERT_UUID_MAP:
         if tag in tag_set:
             return uuid
     return DEFAULT_ALERT_UUID
@@ -939,10 +939,24 @@ def _apply_hashes_transform(selection_dict: dict) -> Optional[dict]:
     Semantics note: if the original value is a list of mixed algos (e.g.
     ``[MD5=x, SHA256=y]``), Sigma treats them as OR-matched under the same
     key. This transform emits them as AND-matched sibling keys within the
-    same dict, which is a known approximation — real-world Valhalla rules
-    that use Hashes almost always list values of a single algo, where the
-    approximation is exact (the split preserves OR because same-key lists
-    remain lists).
+    same dict, which is a known approximation.
+
+    Two cases where the approximation stays exact and covers the entire
+    Valhalla feed in practice:
+
+    1. Single-algo lists (e.g. ``[MD5=x, MD5=y]``) — values collapse back
+       into a same-key list, so OR is preserved.
+    2. Multi-algo IOC lists that enumerate malicious files by fingerprint
+       (e.g. ``[SHA256=A, SHA1=B, MD5=C, SHA256=D, SHA1=E, MD5=F]``, one
+       set of hashes per file). A real event has exactly one digest per
+       algo, so the AND across sibling algo keys is satisfied iff the
+       event's file matches one of the listed fingerprints — which is the
+       intended OR-over-files semantic. Valhalla's Hashes rules are all
+       of this shape.
+
+    The approximation would only misbehave for lists of *orphan* hashes
+    (unrelated files, one algo each), which don't occur in Valhalla-authored
+    IOC rules.
 
     Returns:
         - The updated dict on success.
@@ -1114,16 +1128,6 @@ def sigma_rule_to_catalog_payload(
     Optional Sekoia fields (``tags``, ``false_positives``) are included
     only when the source Sigma rule actually carries the corresponding
     data.
-
-    ``community_uuid``, ``related_object_refs`` and ``datasources`` are
-    intentionally omitted: ``community_uuid`` triggers Sekoia's AU202
-    scope check when combined with rule metadata (and Sekoia silently
-    overrides it with its own default anyway); ``related_object_refs``
-    expects Sekoia catalog UUIDs — the Sigma-world UUIDs from a rule's
-    ``related`` list don't correspond to anything in the tenant, so the
-    field would just carry dangling references; ``datasources`` is a
-    list of tenant-registered data-source UUIDs and can't be derived
-    from Sigma's free-form ``logsource`` dict.
     """
     title = parsed.get("title") or rule.get("name") or rule.get("filename") or "unnamed"
     if len(title) > MAX_NAME_LENGTH:
