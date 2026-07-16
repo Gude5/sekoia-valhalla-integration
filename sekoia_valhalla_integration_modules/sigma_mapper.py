@@ -1021,12 +1021,11 @@ def _convert_selection(
     return node
 
 
-def convert_payload_to_ecs(
-    payload_yaml: str,
+def convert_parsed_to_ecs(
+    parsed: dict,
     mapping: Optional[dict[str, str]] = None,
 ) -> tuple[Optional[dict], list[str]]:
-    """Parse a Sigma rule YAML, ECS-convert its detection block, return the
-    parsed rule as a dict.
+    """ECS-convert the ``detection`` block of an already-parsed Sigma rule.
 
     Only ``parsed["detection"]`` is transformed. Every other field
     (``title``, ``description``, ``level``, ``status``, ``tags``,
@@ -1034,7 +1033,7 @@ def convert_payload_to_ecs(
     so the caller can lift them into structured Sekoia body fields.
 
     Args:
-        payload_yaml: The raw Sigma rule YAML text.
+        parsed: The parsed Sigma rule dict.
         mapping: Field-name mapping to use. Defaults to :data:`RAW_TO_ECS`.
 
     Returns:
@@ -1042,20 +1041,11 @@ def convert_payload_to_ecs(
         is resolvable, otherwise ``(None, [unique_unmapped_field_names])``.
         The unmapped list is de-duplicated and sorted for stable output.
 
-        On YAML parse failure returns ``(None, ["<yaml-parse-error>"])``.
         On missing/malformed detection block returns
         ``(None, ["<no-detection>"])``.
     """
     if mapping is None:
         mapping = RAW_TO_ECS
-
-    try:
-        parsed = yaml.safe_load(payload_yaml)
-    except yaml.YAMLError:
-        return None, ["<yaml-parse-error>"]
-
-    if not isinstance(parsed, dict):
-        return None, ["<invalid-root>"]
 
     detection = parsed.get("detection")
     if not isinstance(detection, dict):
@@ -1077,6 +1067,33 @@ def convert_payload_to_ecs(
 
     parsed["detection"] = new_detection
     return parsed, []
+
+
+def convert_payload_to_ecs(
+    payload_yaml: str,
+    mapping: Optional[dict[str, str]] = None,
+) -> tuple[Optional[dict], list[str]]:
+    """YAML-parsing wrapper around :func:`convert_parsed_to_ecs`.
+
+    Only used by the test suite — production code parses YAML once at the
+    top of the sync loop and calls :func:`convert_parsed_to_ecs` directly.
+    Kept here so tests can exercise the YAML entry-point cases
+    (``<yaml-parse-error>``, ``<invalid-root>``) without inlining a parse
+    step in every test.
+
+    Returns ``(None, ["<yaml-parse-error>"])`` on YAML parse failure and
+    ``(None, ["<invalid-root>"])`` if the YAML root is not a mapping.
+    Otherwise delegates to :func:`convert_parsed_to_ecs`.
+    """
+    try:
+        parsed = yaml.safe_load(payload_yaml)
+    except yaml.YAMLError:
+        return None, ["<yaml-parse-error>"]
+
+    if not isinstance(parsed, dict):
+        return None, ["<invalid-root>"]
+
+    return convert_parsed_to_ecs(parsed, mapping)
 
 
 def sigma_rule_to_catalog_payload(

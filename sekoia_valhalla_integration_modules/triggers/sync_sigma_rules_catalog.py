@@ -13,7 +13,7 @@ from sekoia_valhalla_integration_modules.sekoia_client import (
 from sekoia_valhalla_integration_modules.sigma_mapper import (
     SEVERITY_MAP,
     STATUS_EFFORT_MAP,
-    convert_payload_to_ecs,
+    convert_parsed_to_ecs,
     sigma_rule_to_catalog_payload,
 )
 
@@ -41,16 +41,10 @@ class SyncSigmaRulesCatalog(Trigger):
         scheduler.add_job(self._sync_once, "interval", seconds=frequency)
         scheduler.start()
 
-    def _rule_passes_filter(self, content_yaml: str) -> bool:
+    def _rule_passes_filter(self, parsed: dict) -> bool:
         """Return True when the rule's Sigma ``level`` and ``status``
         both exist and meet the configured minimums. Rules missing
         either field are always filtered out."""
-        try:
-            parsed = yaml.safe_load(content_yaml) or {}
-        except yaml.YAMLError:
-            return False
-        if not isinstance(parsed, dict):
-            return False
         level = (parsed.get("level") or "").lower()
         status = (parsed.get("status") or "").lower()
         level_score = SEVERITY_MAP.get(level)
@@ -79,11 +73,20 @@ class SyncSigmaRulesCatalog(Trigger):
                         continue
 
                     content = rule.get("content", "")
-                    if not self._rule_passes_filter(content):
+                    try:
+                        parsed_rule = yaml.safe_load(content)
+                    except yaml.YAMLError:
+                        parsed_rule = None
+                    if not isinstance(parsed_rule, dict):
+                        skipped_unmapped += 1
+                        unmapped_field_counter["<yaml-parse-error>"] += 1
+                        continue
+
+                    if not self._rule_passes_filter(parsed_rule):
                         filtered_out += 1
                         continue
 
-                    parsed, unmapped = convert_payload_to_ecs(content)
+                    parsed, unmapped = convert_parsed_to_ecs(parsed_rule)
                     if parsed is None:
                         skipped_unmapped += 1
                         for f in unmapped:
