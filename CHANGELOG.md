@@ -7,30 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-### Tests / repo
-- **ECS field-mapping tables moved out of `sigma_mapper` into a new
-  `ecs_field_maps` module.** Split is data/logic: the four SigmaHQ
-  pipeline dicts (`RAW_TO_ECS_SIGMAHQ_WINDOWS/MACOS/ZEEK/KUBERNETES`),
-  `RAW_TO_ECS_CUSTOM`, the merge helpers (`_strip_caseless`,
-  `_merge_sigmahq`), the merged runtime `RAW_TO_ECS`,
-  `CONTEXT_AWARE_FIELDS`, and `_ECS_PASSTHROUGH_FIELDS` all live in
-  `ecs_field_maps.py`. `sigma_mapper.py` drops from ~1200 lines to
-  ~410 and keeps only the small constants (`SEVERITY_MAP`,
-  `STATUS_EFFORT_MAP`, `TAG_ALERT_UUID_MAP`, `MARKER_TAG`, size
-  limits) alongside the conversion functions. Test imports that
-  referenced the pipeline dicts by name now target
-  `ecs_field_maps` directly; `RAW_TO_ECS` remains reachable via
-  `sigma_mapper` as a re-export. No behavior change.
-- Added `test_updated_content_reaches_put_body` covering the update
-  path end-to-end: sync #1 seeds the id-map, the rule's content changes
-  on the feed, sync #2 must PUT the stored sekoia_uuid with a body that
-  reflects the new content. Closes a coverage gap — prior tests only
-  counted PUT calls without inspecting the body or target UUID.
-- `tests/` is no longer excluded from the pushed repo (was under the
-  dev-only section of `.gitignore`). Sekoia's importer ignores the
-  directory at runtime; shipping it makes CI-side verification and
-  external review possible without a separate checkout.
-
 ### Removed
 - **Breaking**: `sync-sigma-intelligence-center` trigger removed. The
   Intelligence Center path never went beyond an initial experiment; the
@@ -43,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deleted along with its test file.
 
 ### Added
+- Test `test_updated_content_reaches_put_body` covering the update
+  path end-to-end: sync #1 seeds the id-map, the rule's content changes
+  on the feed, sync #2 must PUT the stored sekoia_uuid with a body that
+  reflects the new content. Closes a coverage gap — prior tests only
+  counted PUT calls without inspecting the body or target UUID.
 - New mapping `IsatapRouter` → `winlog.event_data.IsatapRouter`, closing
   the `windows/-/system` gap in the v0.3.1 field-acceptance probe.
   Follows the standard `winlog.event_data.*` passthrough pattern already
@@ -83,6 +64,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed redundant `QueryName` from CUSTOM (already in SigmaHQ Windows).
 
 ### Changed
+- **ECS field-mapping tables moved out of `sigma_mapper` into a new
+  `ecs_field_maps` module.** Split is data/logic: the four SigmaHQ
+  pipeline dicts (`RAW_TO_ECS_SIGMAHQ_WINDOWS/MACOS/ZEEK/KUBERNETES`),
+  `RAW_TO_ECS_CUSTOM`, the merge helpers (`_strip_caseless`,
+  `_merge_sigmahq`), the merged runtime `RAW_TO_ECS`,
+  `CONTEXT_AWARE_FIELDS`, and `_ECS_PASSTHROUGH_FIELDS` all live in
+  `ecs_field_maps.py`. `sigma_mapper.py` drops from ~1200 lines to
+  ~410 and keeps only the small constants (`SEVERITY_MAP`,
+  `STATUS_EFFORT_MAP`, `TAG_ALERT_UUID_MAP`, `MARKER_TAG`, size
+  limits) alongside the conversion functions. Test imports that
+  referenced the pipeline dicts by name now target
+  `ecs_field_maps` directly; `RAW_TO_ECS` remains reachable via
+  `sigma_mapper` as a re-export. No behavior change.
+- `tests/` is no longer excluded from the pushed repo (was under the
+  dev-only section of `.gitignore`). Sekoia's importer ignores the
+  directory at runtime; shipping it makes CI-side verification and
+  external review possible without a separate checkout.
 - **Sync trigger parses each rule's YAML once** (previously twice — once
   in `_rule_passes_filter`, once in `convert_payload_to_ecs`). Extracted
   `convert_parsed_to_ecs(parsed: dict, ...)` in `sigma_mapper` as the
