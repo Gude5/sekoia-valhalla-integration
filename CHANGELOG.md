@@ -8,6 +8,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Removed
+- **Symbolic-mapping audit against Sekoia intake parsers** (verified
+  against `SEKOIA-IO/intake-formats` on 2026-07-16). Removed or fixed
+  every entry where our target ECS field name doesn't match what
+  Sekoia's parser actually emits — rules using those fields were
+  POSTing successfully but never matching live events. **Net: ~109
+  rules moved from "mapped-but-inert" to honestly `skipped_unmapped`,
+  and ~85 rules moved from "mapped-but-symbolic" to
+  "mapped-and-actually-matching":**
+  - `RAW_TO_ECS_SIGMAHQ_KUBERNETES` dict deleted entirely and removed
+    from `_merge_sigmahq`. Every one of its 9 targets pointed at the
+    `kubernetes.audit.*` namespace, which Sekoia's K8s audit parser
+    doesn't emit (it uses flat `kubernetes.*` fields plus `event.action`
+    for `verb` and `user.name` for `user.username`). Corrected
+    entries live in `RAW_TO_ECS_CUSTOM`.
+  - `RAW_TO_ECS_SIGMAHQ_ZEEK` pruned from 405 to 74 entries. Dropped
+    331 whose targets started with `zeek.*` or `kubernetes.audit.*`;
+    Sekoia's Corelight parser flattens Zeek events to standard ECS
+    (`file.hash.*`, `file.mime_type`, `tls.client.ja3`, `tls.server.ja3s`).
+    The 74 remaining entries all target standard ECS namespaces
+    Sekoia does emit (dns.*, http.*, url.*, source.*, destination.*,
+    user_agent.*, network.*, event.*).
+  - `RAW_TO_ECS_CUSTOM` cleanup:
+    - `errorCode` → `event.code` (was `aws.cloudtrail.error_code`,
+      symbolic — Sekoia's aws-cloudtrail parser writes `event.code`).
+    - `riskEventType` → `azuread.properties.riskEventType` (was
+      `azure.signinlogs.properties.risk_event_type`, symbolic — Sekoia
+      uses the Azure AD parser's `azuread.*` namespace, not
+      `azure.signinlogs.*`).
+    - `AuthenticationRequirement` → `azuread.properties.authenticationRequirement`
+      (same reason).
+    - `objectRef.name` / `.namespace` / `.resource` / `.apiGroup` /
+      `.subresource` remapped from `kubernetes.audit.objectRef.*` to
+      the flat `kubernetes.*` names Sekoia emits.
+    - New `verb` → `event.action` and `apiGroup` → `kubernetes.api.group`
+      entries in CUSTOM (fill the gap left by removing the SigmaHQ K8s
+      pipeline). New `md5`/`sha1`/`sha256` → `file.hash.*`,
+      `mime_type` → `file.mime_type`, `ja3` → `tls.client.ja3`,
+      `ja3s` → `tls.server.ja3s` (fill the gap left by pruning
+      `zeek.files.*` / `zeek.ssl.*` from the SigmaHQ Zeek pipeline).
+    - Deleted `ResultType` (Sekoia's Azure AD parser doesn't emit it),
+      `properties.message` (not in Azure activity-logs parser),
+      `auditType.action` / `auditType.category` (used by Bitbucket
+      rules, but Sekoia has no Bitbucket intake at all — mapping was
+      pointing at the non-existent `google_workspace.*` namespace).
+  - `winlog.event_data.*` entries in CUSTOM (~34 fields) NOT touched
+    but flagged with an inline TODO — Sekoia's Windows / Winlogbeat
+    parsers don't explicitly emit that namespace either, so they may
+    also be symbolic. Whether they still work depends on Sekoia's
+    search-index behavior for raw event JSON paths. Empirical
+    tenant-side check required before dropping.
 - **Breaking**: `sync-sigma-intelligence-center` trigger removed. The
   Intelligence Center path never went beyond an initial experiment; the
   Rules Catalog path (`sync-sigma-rules-catalog`) is the sole supported

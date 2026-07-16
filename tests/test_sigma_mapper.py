@@ -462,9 +462,9 @@ def _single_field_rule(field: str, value: str = "'foo'") -> str:
         ("eventName", "event.action"),
         ("eventSource", "event.provider"),
         ("operationName", "event.action"),
-        ("errorCode", "aws.cloudtrail.error_code"),
-        ("properties.message", "azure.activitylogs.properties.message"),
-        ("riskEventType", "azure.signinlogs.properties.risk_event_type"),
+        ("errorCode", "event.code"),
+        ("riskEventType", "azuread.properties.riskEventType"),
+        ("AuthenticationRequirement", "azuread.properties.authenticationRequirement"),
         # Linux auditd
         ("SYSCALL", "auditd.data.syscall"),
         ("a0", "auditd.data.a0"),
@@ -503,8 +503,22 @@ def _single_field_rule(field: str, value: str = "'foo'") -> str:
         # Zeek network
         ("dst_ip", "destination.ip"),
         ("src_ip", "source.ip"),
-        # Kubernetes
-        ("verb", "kubernetes.audit.verb"),
+        # Kubernetes (verified against Sekoia's kubernetes-audit-log parser)
+        ("verb", "event.action"),
+        ("apiGroup", "kubernetes.api.group"),
+        ("objectRef.name", "kubernetes.object.name"),
+        ("objectRef.namespace", "kubernetes.namespace"),
+        ("objectRef.resource", "kubernetes.resource"),
+        ("objectRef.apiGroup", "kubernetes.api.group"),
+        ("objectRef.subresource", "kubernetes.subresource"),
+        # Zeek file/TLS fingerprint fields (verified against Sekoia's
+        # Corelight parser — flat file.hash.*/file.mime_type/tls.*)
+        ("md5", "file.hash.md5"),
+        ("sha1", "file.hash.sha1"),
+        ("sha256", "file.hash.sha256"),
+        ("mime_type", "file.mime_type"),
+        ("ja3", "tls.client.ja3"),
+        ("ja3s", "tls.server.ja3s"),
     ],
 )
 def test_tier1_field_maps_correctly(raw, ecs):
@@ -851,12 +865,6 @@ def test_signature_maps_statically_regardless_of_category(category):
         ("eventType", "event.action"),
         ("EventType", "event.action"),
         ("OperationName", "event.action"),
-        # Azure sign-in
-        ("AuthenticationRequirement", "azure.signinlogs.properties.authentication_requirement"),
-        ("ResultType", "azure.signinlogs.properties.result_type"),
-        # Google Workspace
-        ("auditType.action", "google_workspace.event.type"),
-        ("auditType.category", "google_workspace.event.category"),
         # Auditd extras
         ("a2", "auditd.data.a2"),
         ("a3", "auditd.data.a3"),
@@ -874,9 +882,6 @@ def test_signature_maps_statically_regardless_of_category(category):
         ("Path", "winlog.event_data.Path"),
         ("Contents", "winlog.event_data.Contents"),
         ("ContextInfo", "winlog.event_data.ContextInfo"),
-        # Kubernetes dotted
-        ("objectRef.resource", "kubernetes.audit.objectRef.resource"),
-        ("objectRef.namespace", "kubernetes.audit.objectRef.namespace"),
     ],
 )
 def test_custom_map_additions_are_reachable(raw, ecs):
