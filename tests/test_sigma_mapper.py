@@ -480,6 +480,7 @@ def _single_field_rule(field: str, value: str = "'foo'") -> str:
         ("GrantedAccess", "winlog.event_data.GrantedAccess"),
         ("CallTrace", "winlog.event_data.CallTrace"),
         ("InterfaceUuid", "winlog.event_data.InterfaceUuid"),
+        ("IsatapRouter", "winlog.event_data.IsatapRouter"),
         # Custom W3C ELF variant
         ("userAgent", "user_agent.original"),
         # macOS (SigningID unique to pySigma macos pipeline)

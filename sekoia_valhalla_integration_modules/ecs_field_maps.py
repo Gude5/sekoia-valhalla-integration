@@ -589,6 +589,15 @@ RAW_TO_ECS_CUSTOM: dict[str, str] = {
     "eventType": "event.action",         # CloudTrail eventType
     "EventType": "event.action",         # PascalCase variant
     "errorCode": "aws.cloudtrail.error_code",
+    # ``requestParameters.*`` fields aren't mapped. Sekoia's aws-cloudtrail
+    # parser stores the whole ``requestParameters`` object as a JSON blob
+    # at ``aws.cloudtrail.flattened.request_parameters`` (verified against
+    # SEKOIA-IO/intake-formats AWS/aws-cloudtrail/ingest/parser.yml) rather
+    # than expanding subfields, so a flat ECS mapping would be symbolic.
+    # A JSON-blob substring-match transform was considered but dropped —
+    # only 4 rules in the ~3.6k Valhalla feed reference ``requestParameters.*``
+    # (2 of which have shapes a transform could handle). Not worth the code
+    # for the yield.
     # Azure activity + sign-in logs
     "properties.message": "azure.activitylogs.properties.message",
     "riskEventType": "azure.signinlogs.properties.risk_event_type",
@@ -625,6 +634,7 @@ RAW_TO_ECS_CUSTOM: dict[str, str] = {
     "Details": "winlog.event_data.Details",
     "GrantedAccess": "winlog.event_data.GrantedAccess",
     "InterfaceUuid": "winlog.event_data.InterfaceUuid",
+    "IsatapRouter": "winlog.event_data.IsatapRouter",
     "Level": "winlog.event_data.Level",
     "LogonType": "winlog.event_data.LogonType",
     "ModifyingApplication": "winlog.event_data.ModifyingApplication",
