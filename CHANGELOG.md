@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Tests / repo
+- Added `test_updated_content_reaches_put_body` covering the update
+  path end-to-end: sync #1 seeds the id-map, the rule's content changes
+  on the feed, sync #2 must PUT the stored sekoia_uuid with a body that
+  reflects the new content. Closes a coverage gap — prior tests only
+  counted PUT calls without inspecting the body or target UUID.
+- `tests/` is no longer excluded from the pushed repo (was under the
+  dev-only section of `.gitignore`). Sekoia's importer ignores the
+  directory at runtime; shipping it makes CI-side verification and
+  external review possible without a separate checkout.
+
 ### Removed
 - **Breaking**: `sync-sigma-intelligence-center` trigger removed. The
   Intelligence Center path never went beyond an initial experiment; the

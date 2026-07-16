@@ -225,7 +225,6 @@ __marimo__/
 # the module. Reintroduce individual paths if you want them in the pushed
 # repo.
 # ---------------------------------------------------------------------------
-tests/
 scripts/
 e2e-subplans/
 docs/
