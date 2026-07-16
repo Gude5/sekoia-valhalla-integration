@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+- **Sync trigger parses each rule's YAML once** (previously twice — once
+  in `_rule_passes_filter`, once in `convert_payload_to_ecs`). Extracted
+  `convert_parsed_to_ecs(parsed: dict, ...)` in `sigma_mapper` as the
+  core dict-accepting function; `convert_payload_to_ecs(yaml_str, ...)`
+  remains as a thin YAML-parsing wrapper, kept for the test suite.
+  `_rule_passes_filter` now takes a parsed dict.
+- Malformed-YAML rules are no longer silently dropped by the filter;
+  they are counted under `skipped_unmapped` with a `<yaml-parse-error>`
+  bucket in `top_unmapped`, matching how the ECS converter already
+  handled the same case.
+- Renamed `STATUS_TO_EFFORT` → `STATUS_EFFORT_MAP` and dropped the
+  separate `STATUS_RANK` dict. The sync trigger's status filter now
+  uses effort directly (lower effort = higher maturity, so the
+  comparison is inverted vs the old rank-based version). The trigger's
+  internal attribute renamed `_min_status_rank` → `_max_status_effort`.
+  No user-facing config change; `min_sigma_status` still accepts the
+  same values.
+- `DEFAULT_EFFORT` changed from `2` → `3` (used when a Sigma rule has
+  no `status` field; filter never accepts such rules, so this only
+  affects the `effort` value written on rules imported via non-filter
+  paths).
+- Renamed `TAG_TO_ALERT_UUID` → `TAG_ALERT_UUID_MAP`.
+- Renamed the local counter `skipped_filter` → `filtered_out` in the
+  sync loop, and updated the summary log label to match. The JSON
+  event field `"skipped_filter"` is unchanged (downstream contract).
+
 ### Added
 - **RAW_TO_ECS_CUSTOM expanded from 32 to 68 entries**, targeting the
   highest-count unmapped fields from the live-feed histogram. New
