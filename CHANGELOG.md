@@ -7,20 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-### Added
-- New mapping `IsatapRouter` → `winlog.event_data.IsatapRouter`, closing
-  the `windows/-/system` gap in the v0.3.1 field-acceptance probe.
-  Follows the standard `winlog.event_data.*` passthrough pattern already
-  used for 22 other Windows Security fields.
-- (Considered and dropped: an AWS CloudTrail `requestParameters.*`
-  transform rewriting nested Sigma keys into substring matches on the
-  `aws.cloudtrail.flattened.request_parameters` JSON blob Sekoia's
-  parser stores. A live count against the demo Valhalla feed showed
-  only 4 rules reference `requestParameters.*` — 2 fully convertible,
-  2 with unsupported shapes — so the yield didn't justify the code.
-  Left a note on the AWS CloudTrail block in `ecs_field_maps.py` for
-  future maintainers.)
-
 ### Tests / repo
 - **ECS field-mapping tables moved out of `sigma_mapper` into a new
   `ecs_field_maps` module.** Split is data/logic: the four SigmaHQ
@@ -84,6 +70,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   event field `"skipped_filter"` is unchanged (downstream contract).
 
 ### Added
+- New mapping `IsatapRouter` → `winlog.event_data.IsatapRouter`, closing
+  the `windows/-/system` gap in the v0.3.1 field-acceptance probe.
+  Follows the standard `winlog.event_data.*` passthrough pattern already
+  used for 22 other Windows Security fields.
+- (Considered and dropped: an AWS CloudTrail `requestParameters.*`
+  transform rewriting nested Sigma keys into substring matches on the
+  `aws.cloudtrail.flattened.request_parameters` JSON blob Sekoia's
+  parser stores. A live count against the demo Valhalla feed showed
+  only 4 rules reference `requestParameters.*` — 2 fully convertible,
+  2 with unsupported shapes — so the yield didn't justify the code.
+  Left a note on the AWS CloudTrail block in `ecs_field_maps.py` for
+  future maintainers.)
 - **RAW_TO_ECS_CUSTOM expanded from 32 to 68 entries**, targeting the
   highest-count unmapped fields from the live-feed histogram. New
   additions:
