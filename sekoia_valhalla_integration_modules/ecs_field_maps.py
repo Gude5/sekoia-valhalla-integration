@@ -293,61 +293,56 @@ RAW_TO_ECS_CUSTOM: dict[str, str] = {
     "a4": "auditd.data.a4",
     "exe": "process.executable",
     "cfgpath": "auditd.data.cfgpath",
-    # Windows Security event_data — enumerated under `winlog.event_data.*`
-    # matching SigmaHQ's Windows pipeline auto-prefix transformation.
-    #
-    # TODO(verify): Sekoia's Windows and Winlogbeat parsers
-    # (SEKOIA-IO/intake-formats Windows/windows/ and Beats/winlogbeat/) do
-    # NOT explicitly emit `winlog.event_data.*` fields in their `set_ecs_*`
-    # stages — they extract specific fields into standard ECS positions
-    # instead. These `winlog.event_data.*` mappings may therefore be
-    # symbolic: rules using them will POST successfully but may never
-    # match a live event. Whether Sekoia's search engine can still query
-    # nested paths that survive from the raw input JSON is a tenant-side
-    # empirical question. If a tenant test confirms these fields aren't
-    # queryable, this block should be removed (same treatment as the K8s
-    # and Zeek symbolic entries removed 2026-07-16).
-    "AccessList": "winlog.event_data.AccessList",
-    "AccessMask": "winlog.event_data.AccessMask",
-    "AttributeLDAPDisplayName": "winlog.event_data.AttributeLDAPDisplayName",
-    "AttributeValue": "winlog.event_data.AttributeValue",
-    "AuthenticationPackageName": "winlog.event_data.AuthenticationPackageName",
-    "CallTrace": "winlog.event_data.CallTrace",
-    "Category": "winlog.event_data.Category",
-    "Configuration": "winlog.event_data.Configuration",
-    "Contents": "winlog.event_data.Contents",
-    "ContextInfo": "winlog.event_data.ContextInfo",
-    "Data": "winlog.event_data.Data",
-    "Details": "winlog.event_data.Details",
-    "FilterName": "winlog.event_data.FilterName",
-    "GrantedAccess": "winlog.event_data.GrantedAccess",
-    "InterfaceUuid": "winlog.event_data.InterfaceUuid",
-    "IsatapRouter": "winlog.event_data.IsatapRouter",
-    "Level": "winlog.event_data.Level",
-    "LogonId": "winlog.event_data.LogonId",
-    "LogonProcessName": "winlog.event_data.LogonProcessName",
-    "LogonType": "winlog.event_data.LogonType",
-    "ModifyingApplication": "winlog.event_data.ModifyingApplication",
-    "NewValue": "winlog.event_data.NewValue",
-    "ObjectClass": "winlog.event_data.ObjectClass",
-    "ObjectDN": "winlog.event_data.ObjectDN",
-    "ObjectName": "winlog.event_data.ObjectName",
-    "ObjectServer": "winlog.event_data.ObjectServer",
-    "ObjectType": "winlog.event_data.ObjectType",
-    "ObjectValueName": "winlog.event_data.ObjectValueName",
-    "OpNum": "winlog.event_data.OpNum",
-    "Path": "winlog.event_data.Path",
-    "PrivilegeList": "winlog.event_data.PrivilegeList",
-    "RelativeTargetName": "winlog.event_data.RelativeTargetName",
-    "SamAccountName": "winlog.event_data.SamAccountName",
-    "ShareName": "winlog.event_data.ShareName",
-    "SourceName": "winlog.event_data.SourceName",
-    "Status": "winlog.event_data.Status",
-    "SubjectUserSid": "winlog.event_data.SubjectUserSid",
-    "TargetName": "winlog.event_data.TargetName",
-    "TaskContent": "winlog.event_data.TaskContent",
-    "TaskName": "winlog.event_data.TaskName",
-    "TicketEncryptionType": "winlog.event_data.TicketEncryptionType",
+    # Windows Security event_data — Sekoia's Winlogbeat/Windows parsers
+    # route arbitrary event_data.<X> subfields to `action.properties.<X>`,
+    # verified 2026-07-17 by pushing a synthetic Winlogbeat event to a
+    # USA1 tenant with `winlog.event_data.AccessMask=0xDEADBEEF` and
+    # confirming the value was queryable at `action.properties.AccessMask`
+    # (and NOT at `winlog.event_data.AccessMask`). Same test verified
+    # `action.properties.ObjectName` and `action.properties.ProcessName`.
+    # Every SigmaHQ Windows Sigma rule field that isn't extracted into a
+    # named ECS position lands under this prefix.
+    "AccessList": "action.properties.AccessList",
+    "AccessMask": "action.properties.AccessMask",
+    "AttributeLDAPDisplayName": "action.properties.AttributeLDAPDisplayName",
+    "AttributeValue": "action.properties.AttributeValue",
+    "AuthenticationPackageName": "action.properties.AuthenticationPackageName",
+    "CallTrace": "action.properties.CallTrace",
+    "Category": "action.properties.Category",
+    "Configuration": "action.properties.Configuration",
+    "Contents": "action.properties.Contents",
+    "ContextInfo": "action.properties.ContextInfo",
+    "Data": "action.properties.Data",
+    "Details": "action.properties.Details",
+    "FilterName": "action.properties.FilterName",
+    "GrantedAccess": "action.properties.GrantedAccess",
+    "InterfaceUuid": "action.properties.InterfaceUuid",
+    "IsatapRouter": "action.properties.IsatapRouter",
+    "Level": "action.properties.Level",
+    "LogonId": "action.properties.LogonId",
+    "LogonProcessName": "action.properties.LogonProcessName",
+    "LogonType": "action.properties.LogonType",
+    "ModifyingApplication": "action.properties.ModifyingApplication",
+    "NewValue": "action.properties.NewValue",
+    "ObjectClass": "action.properties.ObjectClass",
+    "ObjectDN": "action.properties.ObjectDN",
+    "ObjectName": "action.properties.ObjectName",
+    "ObjectServer": "action.properties.ObjectServer",
+    "ObjectType": "action.properties.ObjectType",
+    "ObjectValueName": "action.properties.ObjectValueName",
+    "OpNum": "action.properties.OpNum",
+    "Path": "action.properties.Path",
+    "PrivilegeList": "action.properties.PrivilegeList",
+    "RelativeTargetName": "action.properties.RelativeTargetName",
+    "SamAccountName": "action.properties.SamAccountName",
+    "ShareName": "action.properties.ShareName",
+    "SourceName": "action.properties.SourceName",
+    "Status": "action.properties.Status",
+    "SubjectUserSid": "action.properties.SubjectUserSid",
+    "TargetName": "action.properties.TargetName",
+    "TaskContent": "action.properties.TaskContent",
+    "TaskName": "action.properties.TaskName",
+    "TicketEncryptionType": "action.properties.TicketEncryptionType",
     # Users (Sigma canonical → ECS user.*)
     "SubjectUserName": "user.name",
     "TargetUserName": "user.target.name",
@@ -485,7 +480,7 @@ CONTEXT_AWARE_FIELDS: dict[str, dict[str, str]] = {
     "Description": {
         "process_creation": "process.pe.description",
         "image_load": "file.pe.description",
-        "sysmon_error": "winlog.event_data.Description",
+        "sysmon_error": "action.properties.Description",
     },
     "Product": {
         "process_creation": "process.pe.product",

@@ -309,6 +309,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dry-run-only, no API calls.
 
 ### Fixed
+- **Nested `winlog.event_data.<X>` mappings corrected to
+  `action.properties.<X>`** — the block was flagged with a TODO in
+  0.11.0 pending an empirical tenant check. On 2026-07-17 a synthetic
+  Winlogbeat event was pushed to a USA1 tenant with
+  `winlog.event_data.AccessMask=0xDEADBEEF` (and matching markers on
+  `ObjectName`, `ProcessName`). Query on `winlog.event_data.AccessMask`
+  did NOT match; query on `action.properties.AccessMask` DID. Same
+  pattern held for `ObjectName` and `ProcessName`. Every Sigma rule
+  using these fields was POSTing successfully but not firing at 0.11.0.
+  Rewrites for this release:
+  - All 41 `winlog.event_data.<X>` entries in `RAW_TO_ECS_CUSTOM`
+    rewritten to `action.properties.<X>` (`AccessMask`, `LogonType`,
+    `ObjectName`, `TaskName`, `PrivilegeList`, `SubjectUserSid`, etc.).
+    ~100 rules affected — they now actually match live Winlogbeat events.
+  - Nested `Description` context-aware branch: `sysmon_error` category
+    rewritten from `winlog.event_data.Description` to
+    `action.properties.Description`.
+  - Top-level `winlog.<X>` fields (`Channel → winlog.channel`,
+    `ComputerName → winlog.computer_name`, `Provider_Name →
+    winlog.provider_name`, `EventLog → winlog.channel`) were verified
+    queryable as-is via the same probe (`winlog.computer_name:PROBE-HOST`
+    and `winlog.channel:Security` both matched). These mappings were
+    already correct pre-0.11.1 and are unchanged. Only the *nested*
+    `winlog.event_data.*` path gets flattened by Sekoia's parser.
 - `description` is truncated to Sekoia's 1000-character API limit before
   POSTing. Rules whose Sigma description exceeds 1000 chars (a small tail
   — one rule against the full Valhalla feed) were previously rejected
