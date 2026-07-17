@@ -450,6 +450,8 @@ def _single_field_rule(field: str, value: str = "'foo'") -> str:
         ("Signed", "file.code_signature.signed"),      # SigmaHQ prefixes with `file.`
         ("SignatureStatus", "file.code_signature.status"),
         ("TargetUserName", "user.target.name"),
+        ("TargetDomainName", "user.target.domain"),
+        ("TargetUserSid", "user.target.id"),
         ("Imphash", "file.pe.imphash"),
         # Web / proxy W3C ELF fields (Zeek pipeline)
         ("cs-method", "http.request.method"),

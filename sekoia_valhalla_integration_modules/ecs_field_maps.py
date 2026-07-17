@@ -92,7 +92,14 @@ RAW_TO_ECS_SIGMAHQ_WINDOWS: dict[str, str] = {
     "SourceProcessGuid": "process.entity_id",
     "SourceProcessId": "process.pid",
     "SourceThreadId": "process.thread.id",
-    "TargetDomainName": "user.domain",
+    # TargetDomainName deviates from SigmaHQ upstream (`user.domain`).
+    # Empirically verified 2026-07-17 that Sekoia's Windows and Microsoft
+    # Windows parsers extract Security-EventID `TargetDomainName` to
+    # `user.target.domain` (alongside `TargetUserName → user.target.name`
+    # and `TargetUserSid → user.target.id`), matching the ECS convention
+    # for "target user" in logon events. The upstream `user.domain` target
+    # doesn't get populated by Sekoia and would silently fail to match.
+    "TargetDomainName": "user.target.domain",
     "TargetFilename": "file.path",
     "User": "user.name",
     "WorkstationName": "source.domain",
@@ -343,9 +350,11 @@ RAW_TO_ECS_CUSTOM: dict[str, str] = {
     "TaskContent": "action.properties.TaskContent",
     "TaskName": "action.properties.TaskName",
     "TicketEncryptionType": "action.properties.TicketEncryptionType",
-    # Users (Sigma canonical → ECS user.*)
+    # Users (Sigma canonical → ECS user.*). All three verified 2026-07-17
+    # against Sekoia's Microsoft Windows parser (Security EventID 4624).
     "SubjectUserName": "user.name",
     "TargetUserName": "user.target.name",
+    "TargetUserSid": "user.target.id",
     # Windows event metadata variants
     "EventLog": "winlog.channel",
     # Sysmon fields not in SigmaHQ's static Windows map

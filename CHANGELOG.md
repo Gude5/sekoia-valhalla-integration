@@ -309,6 +309,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dry-run-only, no API calls.
 
 ### Fixed
+- **Target-user attribution for Windows Security events**, verified
+  2026-07-17 against Sekoia's Microsoft Windows and Winlogbeat parsers
+  with a synthetic 4624 (logon) event. Both parsers extract the target
+  user's ECS positions consistently:
+  - `TargetDomainName` remapped from SigmaHQ upstream's `user.domain`
+    (which Sekoia doesn't populate for these events) to
+    `user.target.domain` (which it does). The old mapping was
+    silently symbolic — rules querying `user.domain` in a
+    logon-event context would never match.
+  - `TargetUserSid` added to `RAW_TO_ECS_CUSTOM` as
+    `user.target.id`. Previously unmapped — rules using
+    `TargetUserSid` were falling through to the honest
+    `skipped_unmapped` counter.
+  - `TargetUserName → user.target.name` and
+    `SubjectUserName → user.name` (both pre-existing) were re-verified
+    against the same probe; both work as-is.
+- **Empirical cross-intake probe of Sysmon / PowerShell / signature /
+  DNS fields** (Batch A, 2026-07-17): synthetic events with markers
+  in `ProcessGuid`, `Imphash`, `ScriptBlockText`, `CommandName`,
+  `QueryStatus`, `IsExecutable`, `Signature` were pushed through
+  both Sekoia's Winlogbeat and Microsoft Windows intakes. Neither
+  parser extracted these fields to the SigmaHQ-canonical ECS
+  positions (`process.entity_id`, `powershell.file.script_block_text`,
+  `file.pe.imphash`, `sysmon.dns.status`, `sysmon.file.is_executable`,
+  `file.code_signature.subject_name`); every marker landed at
+  `action.properties.<X>` instead. **However**, no remap was applied
+  — real Winlogbeat traffic pre-populates these ECS positions itself
+  before Sekoia sees the event, so the SigmaHQ mappings are correct
+  in production for tenants using real Winlogbeat as their Windows
+  shipper. Tenants using other Windows shippers (custom syslog, raw
+  agent) may see these rules fail to match; a follow-up would be to
+  detect the shipper and adjust, or ship dual-target rules. Left as
+  a known limitation until a real deployment reports the gap.
 - **Nested `winlog.event_data.<X>` mappings corrected to
   `action.properties.<X>`** — the block was flagged with a TODO in
   0.11.0 pending an empirical tenant check. On 2026-07-17 a synthetic
