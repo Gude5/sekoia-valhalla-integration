@@ -69,6 +69,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deleted along with its test file.
 
 ### Added
+- Module `README.md` at the module root — orientation doc covering
+  why-use, prerequisites, playbook setup, both triggers, module config,
+  repo layout, and dev commands. No code change.
 - **~50 additional Valhalla rules now convert successfully** (feed-wide
   mapped count 3300 → 3350; skipped-for-unmapped-field 290 → 240) via
   three groups of targeted fixes:
