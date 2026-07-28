@@ -1,13 +1,38 @@
+[project]
+name = "sekoia-valhalla-integration-automation-module"
+version = "0.11.3"
+description = "Syncs the Nextron Valhalla Sigma feed into the Sekoia Rules Catalog"
+authors = []
+requires-python = ">=3.11,<3.13"
+
+dependencies = [
+    "sekoia-automation-sdk>=1.23.1,<2",
+    "requests>=2.34.2,<3",
+    "APScheduler>=3.10,<4",
+    "PyYAML>=6.0,<7",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "requests-mock",
+]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "*"
+pytest-cov = "*"
+requests-mock = "*"
+
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=2.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "Automation Module for SekoiaValhallaIntegration"
-description = ""
-version = "0.0"
-authors = []
 package-mode = false
+
+[tool.uv]
+package = false
 
 [tool.black]
 line-length = 119
@@ -17,18 +42,6 @@ include = "\\.pyi?$"
 [tool.isort]
 profile = "black"
 line_length = 119
-
-[tool.poetry.dependencies]
-python = ">=3.11,<3.12"
-sekoia-automation-sdk = "^1.23.1"
-requests = "^2.34.2"
-APScheduler = "^3.10"
-PyYAML = "^6.0"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "*"
-pytest-cov = "*"
-requests-mock = "*"
 
 [tool.coverage.run]
 omit = ["tests/*", "main.py"]
