@@ -35,7 +35,7 @@ To roll back, enable the **Delete all Valhalla-imported rules from the Sekoia Ru
 
 | Field | Secret | Description |
 |---|---|---|
-| `api_key` | yes | Valhalla API key. Defaults to the public demo key. |
+| `valhalla_api_key` | yes | Valhalla API key. Defaults to the public demo key. |
 | `sekoia_api_key` | yes | Sekoia bearer token. Required by both triggers. |
 | `sekoia_base_url` | no | Sekoia API base URL. Defaults to `https://api.sekoia.io` (FRA1). |
 

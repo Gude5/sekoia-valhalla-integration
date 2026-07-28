@@ -4,7 +4,7 @@
     "title": "Sekoia Valhalla Integration",
     "type": "object",
     "properties": {
-      "api_key": {
+      "valhalla_api_key": {
         "type": "string",
         "title": "Valhalla API key",
         "description": "API key from valhalla.nextron-systems.com. The default is the public demo key, which only grants the community feed.",
@@ -23,7 +23,7 @@
       }
     },
     "required": [],
-    "secrets": ["api_key", "sekoia_api_key"]
+    "secrets": ["valhalla_api_key", "sekoia_api_key"]
   },
   "description": "Integration of Valhalla into Sekoia",
   "name": "Sekoia Valhalla Integration",
