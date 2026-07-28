@@ -1,6 +1,6 @@
 [project]
 name = "sekoia-valhalla-integration-automation-module"
-version = "0.0"
+version = "0.11.3"
 description = "Syncs the Nextron Valhalla Sigma feed into the Sekoia Rules Catalog"
 authors = []
 requires-python = ">=3.11,<3.12"

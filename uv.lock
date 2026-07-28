@@ -946,7 +946,7 @@ wheels = [
 
 [[package]]
 name = "sekoia-valhalla-integration-automation-module"
-version = "0.0"
+version = "0.11.3"
 source = { virtual = "." }
 dependencies = [
     { name = "apscheduler" },
