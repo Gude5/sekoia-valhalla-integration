@@ -4,7 +4,7 @@ Sekoia automation module that syncs the [Nextron Valhalla](https://valhalla.next
 
 ## Why use it
 
-Sekoia's Rules Catalog does not ship a commercial Sigma feed as a first-party source. Valhalla is Nextron's Sigma + YARA catalog (the same feed THOR consumes); this integration wires its Sigma portion into Sekoia so it runs in the detection engine alongside native Sekoia content, without hand-authoring or per-rule imports.
+Sekoia's Rules Catalog does not ship a commercial Sigma feed as a first-party source. Valhalla is Nextron's catalog of Sigma and YARA rules. This integration feeds the Sigma half of it into Sekoia, where the rules run in the detection engine next to native Sekoia content — no hand-authoring, no importing rules one at a time.
 
 Roughly 82% of the free community feed converts to executable Sekoia rules on the current mapping tables. The remainder either targets logsources with no clean ECS equivalent or uses context-ambiguous field names and is skipped rather than pushed in a broken state.
 
