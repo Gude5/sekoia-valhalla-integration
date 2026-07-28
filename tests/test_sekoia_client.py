@@ -1,7 +1,11 @@
 import pytest
 import requests_mock
 
+from sekoia_valhalla_integration_modules import sekoia_client
 from sekoia_valhalla_integration_modules.sekoia_client import (
+    LIST_PAGE_SIZE,
+    MAX_LIST_PAGES,
+    SekoiaAPIError,
     SekoiaClient,
     SekoiaRuleNotFoundError,
 )
@@ -157,6 +161,13 @@ def test_delete_rule_raises_on_405():
 # iter_rules — pagination + author filter
 # ---------------------------------------------------------------------------
 
+END_OF_LIST = {"json": {"items": []}}
+
+
+def _offsets(mocker) -> list[str]:
+    """The ``offset`` query param of each request made, in order."""
+    return [req.qs["offset"][0] for req in mocker.request_history]
+
 
 def test_iter_rules_yields_all_items_across_pages():
     client = SekoiaClient(BASE_URL, "k")
@@ -167,23 +178,67 @@ def test_iter_rules_yields_all_items_across_pages():
             [
                 {"json": {"items": [{"uuid": f"sk-{i}"} for i in range(100)]}},
                 {"json": {"items": [{"uuid": "sk-100"}, {"uuid": "sk-101"}]}},
+                END_OF_LIST,
             ],
         )
         uuids = [r["uuid"] for r in client.iter_rules()]
         assert uuids == [f"sk-{i}" for i in range(102)]
 
 
-def test_iter_rules_stops_when_page_is_shorter_than_page_size():
+def test_iter_rules_stops_on_an_empty_page_not_a_short_one():
     client = SekoiaClient(BASE_URL, "k")
     with requests_mock.Mocker() as m:
         m.get(
             RULES_URL,
-            json={"items": [{"uuid": "sk-1"}, {"uuid": "sk-2"}]},
+            [
+                {"json": {"items": [{"uuid": "sk-1"}, {"uuid": "sk-2"}]}},
+                {"json": {"items": [{"uuid": "sk-3"}]}},
+                END_OF_LIST,
+            ],
         )
         uuids = [r["uuid"] for r in client.iter_rules()]
-        # Only one request made — short page terminates pagination.
-        assert uuids == ["sk-1", "sk-2"]
+        assert uuids == ["sk-1", "sk-2", "sk-3"]
+        assert m.call_count == 3
+
+
+def test_iter_rules_walks_every_page_when_server_caps_the_page_size():
+    server_cap = 10
+    all_rules = [{"uuid": f"sk-{i}"} for i in range(25)]
+    pages = [
+        {"json": {"items": all_rules[i : i + server_cap]}}
+        for i in range(0, len(all_rules), server_cap)
+    ]
+
+    client = SekoiaClient(BASE_URL, "k")
+    with requests_mock.Mocker() as m:
+        m.get(RULES_URL, pages + [END_OF_LIST])
+        uuids = [r["uuid"] for r in client.iter_rules()]
+
+        assert uuids == [f"sk-{i}" for i in range(25)]
+        assert _offsets(m) == ["0", "10", "20", "25"]
+        assert m.request_history[0].qs["limit"] == ["100"]
+
+
+def test_iter_rules_returns_nothing_on_an_empty_first_page():
+    client = SekoiaClient(BASE_URL, "k")
+    with requests_mock.Mocker() as m:
+        m.get(RULES_URL, json={"items": []})
+        assert list(client.iter_rules()) == []
         assert m.call_count == 1
+
+
+def test_iter_rules_raises_rather_than_looping_when_offset_is_ignored(monkeypatch):
+    monkeypatch.setattr(sekoia_client, "MAX_LIST_PAGES", 5)
+    client = SekoiaClient(BASE_URL, "k")
+    with requests_mock.Mocker() as m:
+        m.get(RULES_URL, json={"items": [{"uuid": "sk-1"}]})
+        with pytest.raises(SekoiaAPIError, match="did not terminate"):
+            list(client.iter_rules())
+        assert m.call_count == 5
+
+
+def test_max_list_pages_is_generous_enough_for_a_real_tenant():
+    assert MAX_LIST_PAGES * LIST_PAGE_SIZE >= 1_000_000
 
 
 def test_iter_rules_passes_generic_field_filter_as_query_param():
@@ -191,13 +246,17 @@ def test_iter_rules_passes_generic_field_filter_as_query_param():
     with requests_mock.Mocker() as m:
         m.get(
             RULES_URL,
-            json={"items": [{"uuid": "sk-1", "created_by": "key-uuid"}]},
+            [
+                {"json": {"items": [{"uuid": "sk-1", "created_by": "key-uuid"}]}},
+                END_OF_LIST,
+            ],
         )
         list(client.iter_rules(match_field="created_by", match_value="key-uuid"))
-        req = m.last_request
+        req = m.request_history[0]
         assert req.qs.get("match[created_by]") == ["key-uuid"]
         assert req.qs.get("limit") == ["100"]
         assert req.qs.get("offset") == ["0"]
+        assert m.request_history[-1].qs.get("match[created_by]") == ["key-uuid"]
 
 
 def test_iter_rules_client_side_filter_when_server_ignores_query():
@@ -207,13 +266,18 @@ def test_iter_rules_client_side_filter_when_server_ignores_query():
     with requests_mock.Mocker() as m:
         m.get(
             RULES_URL,
-            json={
-                "items": [
-                    {"uuid": "sk-1", "created_by": "key-uuid"},
-                    {"uuid": "sk-2", "created_by": "other-key"},
-                    {"uuid": "sk-3", "created_by": "key-uuid"},
-                ]
-            },
+            [
+                {
+                    "json": {
+                        "items": [
+                            {"uuid": "sk-1", "created_by": "key-uuid"},
+                            {"uuid": "sk-2", "created_by": "other-key"},
+                            {"uuid": "sk-3", "created_by": "key-uuid"},
+                        ]
+                    }
+                },
+                END_OF_LIST,
+            ],
         )
         uuids = [
             r["uuid"]
@@ -222,6 +286,7 @@ def test_iter_rules_client_side_filter_when_server_ignores_query():
             )
         ]
         assert uuids == ["sk-1", "sk-3"]
+        assert _offsets(m) == ["0", "3"]
 
 
 def test_iter_rules_falls_back_to_data_key_when_no_items_key():
@@ -229,7 +294,10 @@ def test_iter_rules_falls_back_to_data_key_when_no_items_key():
     with requests_mock.Mocker() as m:
         m.get(
             RULES_URL,
-            json={"data": [{"uuid": "sk-1"}, {"uuid": "sk-2"}]},
+            [
+                {"json": {"data": [{"uuid": "sk-1"}, {"uuid": "sk-2"}]}},
+                {"json": {"data": []}},
+            ],
         )
         uuids = [r["uuid"] for r in client.iter_rules()]
         assert uuids == ["sk-1", "sk-2"]

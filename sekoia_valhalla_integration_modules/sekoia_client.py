@@ -22,6 +22,7 @@ class SekoiaRuleNotFoundError(SekoiaAPIError):
 
 
 LIST_PAGE_SIZE = 100
+MAX_LIST_PAGES = 10_000  # safety bound for deleting Sigma rules
 
 
 class SekoiaClient:
@@ -119,7 +120,7 @@ class SekoiaClient:
         """
         url = f"{self._base_url}/v1/sic/conf/rules-catalog/rules"
         offset = 0
-        while True:
+        for _ in range(MAX_LIST_PAGES):
             params: dict[str, object] = {"limit": page_size, "offset": offset}
             if match_field and match_value:
                 params[f"match[{match_field}]"] = match_value
@@ -139,6 +140,8 @@ class SekoiaClient:
                 raise SekoiaAPIError(
                     f"GET {url} returned unexpected list shape: {resp.text[:500]}"
                 )
+            if not items:
+                return
 
             for item in items:
                 if match_field and match_value and item.get(match_field) != match_value:
@@ -147,6 +150,9 @@ class SekoiaClient:
                     continue
                 yield item
 
-            if len(items) < page_size:
-                return
-            offset += page_size
+            offset += len(items)
+
+        raise SekoiaAPIError(
+            f"GET {url} did not terminate after {MAX_LIST_PAGES} pages "
+            f"({offset} rules fetched)."
+        )
