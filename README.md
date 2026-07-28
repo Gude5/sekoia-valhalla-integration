@@ -64,8 +64,27 @@ docs/                                          # mapping references and internal
 ## Development
 
 ```
-uv sync                # install deps (uv.lock is authoritative)
+uv sync                # install deps
 uv run pytest          # run the test suite
 ```
 
 The `Dockerfile` builds the runtime image Sekoia executes. Bump `version` in `manifest.json` on every push-worthy change — Sekoia's importer rejects same-version reimports.
+
+### Dependency management (uv *and* poetry)
+
+The module ships **two lockfiles**, because its two consumers want different things:
+
+| Lockfile | Used by |
+|---|---|
+| `uv.lock` | the `Dockerfile` (`uv sync --frozen`) and local development |
+| `poetry.lock` | Sekoia's module importer, which rejects a module that ships no `poetry.lock` |
+
+Runtime dependencies are declared once, in PEP 621 `[project].dependencies` — both tools read it. Dev dependencies must be declared **twice** (`[dependency-groups].dev` for uv, `[tool.poetry.group.dev.dependencies]` for poetry, which doesn't yet read PEP 735 groups).
+
+After changing any dependency, regenerate both:
+
+```
+uv lock && poetry lock
+```
+
+Two resolvers over one dependency set drift silently — the first generation of this pair already disagreed on a transitive package. `tests/test_lockfiles.py` fails if the lockfiles disagree on a runtime version or if the two dev lists diverge, so `uv run pytest` catches it.
