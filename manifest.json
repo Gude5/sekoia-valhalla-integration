@@ -22,7 +22,7 @@
         "default": "https://api.sekoia.io"
       }
     },
-    "required": [],
+    "required": ["sekoia_api_key"],
     "secrets": ["valhalla_api_key", "sekoia_api_key"]
   },
   "description": "Integration of Valhalla into Sekoia",
