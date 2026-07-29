@@ -26,7 +26,7 @@ DEFAULT_MIN_STATUS = "experimental"
 class SyncSigmaRulesCatalog(Trigger):
     def run(self):
         cfg = self.module.configuration
-        self._valhalla = ValhallaClient(cfg.api_key)
+        self._valhalla = ValhallaClient(cfg.valhalla_api_key)
         self._sekoia = SekoiaClient(cfg.sekoia_base_url, cfg.sekoia_api_key)
         self._enabled = self.configuration.get("enabled", False)
         min_level = self.configuration.get("min_sigma_level", DEFAULT_MIN_LEVEL)

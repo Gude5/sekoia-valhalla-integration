@@ -410,10 +410,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dicts of `{id, type}`; only the UUID `id` is forwarded. Rules whose
   `related` entries have no `id` no longer ship the field.
 
-- Module-level configuration: `api_key` (Valhalla, defaults to the public demo
+- Module-level configuration: `valhalla_api_key` (Valhalla, defaults to the public demo
   key), `base_url` (Valhalla, defaults to https://valhalla.nextron-systems.com),
   `sekoia_api_key` (Sekoia bearer token), `sekoia_base_url` (Sekoia API,
-  defaults to https://api.sekoia.io). `api_key` and `sekoia_api_key` are
+  defaults to https://api.sekoia.io). `valhalla_api_key` and `sekoia_api_key` are
   marked as secrets.
 - Thin Valhalla HTTP client wrapping `POST /api/v1/getsigma`
   (form-encoded body, demo-key compatible).

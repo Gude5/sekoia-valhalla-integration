@@ -4,7 +4,7 @@
     "title": "Sekoia Valhalla Integration",
     "type": "object",
     "properties": {
-      "api_key": {
+      "valhalla_api_key": {
         "type": "string",
         "title": "Valhalla API key",
         "description": "API key from valhalla.nextron-systems.com. The default is the public demo key, which only grants the community feed.",
@@ -22,13 +22,13 @@
         "default": "https://api.sekoia.io"
       }
     },
-    "required": [],
-    "secrets": ["api_key", "sekoia_api_key"]
+    "required": ["sekoia_api_key"],
+    "secrets": ["valhalla_api_key", "sekoia_api_key"]
   },
   "description": "Integration of Valhalla into Sekoia",
   "name": "Sekoia Valhalla Integration",
   "slug": "sekoia-valhalla-integration",
   "categories": ["Threat Intelligence"],
-  "uuid": "ee90bd76-6805-4298-a25d-c8950f0209ec",
+  "uuid": "fde151ac-16c7-4d2b-9444-c4a22cd0437e",
   "version": "0.11.3"
 }

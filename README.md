@@ -4,7 +4,7 @@ Sekoia automation module that syncs the [Nextron Valhalla](https://valhalla.next
 
 ## Why use it
 
-Sekoia's Rules Catalog does not ship a commercial Sigma feed as a first-party source. Valhalla is Nextron's Sigma + YARA catalog (the same feed THOR consumes); this integration wires its Sigma portion into Sekoia so it runs in the detection engine alongside native Sekoia content, without hand-authoring or per-rule imports.
+Sekoia's Rules Catalog does not ship a commercial Sigma feed as a first-party source. Valhalla is Nextron's catalog of Sigma and YARA rules. This integration feeds the Sigma half of it into Sekoia, where the rules run in the detection engine next to native Sekoia content — no hand-authoring, no importing rules one at a time.
 
 Roughly 82% of the free community feed converts to executable Sekoia rules on the current mapping tables. The remainder either targets logsources with no clean ECS equivalent or uses context-ambiguous field names and is skipped rather than pushed in a broken state.
 
@@ -35,7 +35,7 @@ To roll back, enable the **Delete all Valhalla-imported rules from the Sekoia Ru
 
 | Field | Secret | Description |
 |---|---|---|
-| `api_key` | yes | Valhalla API key. Defaults to the public demo key. |
+| `valhalla_api_key` | yes | Valhalla API key. Defaults to the public demo key. |
 | `sekoia_api_key` | yes | Sekoia bearer token. Required by both triggers. |
 | `sekoia_base_url` | no | Sekoia API base URL. Defaults to `https://api.sekoia.io` (FRA1). |
 
@@ -64,8 +64,27 @@ docs/                                          # mapping references and internal
 ## Development
 
 ```
-uv sync                # install deps (uv.lock is authoritative)
+uv sync                # install deps
 uv run pytest          # run the test suite
 ```
 
 The `Dockerfile` builds the runtime image Sekoia executes. Bump `version` in `manifest.json` on every push-worthy change — Sekoia's importer rejects same-version reimports.
+
+### Dependency management (uv *and* poetry)
+
+The module ships **two lockfiles**, because its two consumers want different things:
+
+| Lockfile | Used by |
+|---|---|
+| `uv.lock` | the `Dockerfile` (`uv sync --frozen`) and local development |
+| `poetry.lock` | Sekoia's module importer, which rejects a module that ships no `poetry.lock` |
+
+Runtime dependencies are declared once, in PEP 621 `[project].dependencies` — both tools read it. Dev dependencies must be declared **twice** (`[dependency-groups].dev` for uv, `[tool.poetry.group.dev.dependencies]` for poetry, which doesn't yet read PEP 735 groups).
+
+After changing any dependency, regenerate both:
+
+```
+uv lock && poetry lock
+```
+
+Two resolvers over one dependency set drift silently — the first generation of this pair already disagreed on a transitive package. `tests/test_lockfiles.py` fails if the lockfiles disagree on a runtime version or if the two dev lists diverge, so `uv run pytest` catches it.
