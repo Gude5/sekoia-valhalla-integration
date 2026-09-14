@@ -5,16 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.2] - 2026-09-14
+## 1.0.2 - 2026-09-14
 
 ### Changed
 - **Aligned dev workspace with source-of-truth
   `automation-library/Nextron Valhalla Sigma Rules/`.** Module identity
   rebranded to Nextron Valhalla Sigma Rules for the Sekoia catalog listing:
-  - `manifest.json` — `name`, `slug`, `uuid`
-    (`a81edea4-3259-4c20-b68d-0bdc923349d7`), `description`,
+  - `manifest.json` — `name`, `slug`, `description`,
     `configuration.title`, and `sekoia_api_key` description now match the
-    shipped module. Version jumped from `0.11.3` → `1.0.2`.
+    shipped module. Version jumped from `0.11.3` → `1.0.2`. Module `uuid`
+    intentionally kept as `ee90bd76-6805-4298-a25d-c8950f0209ec` (the
+    tenant-deployed UUID) rather than mirroring source of truth, so
+    Sekoia upgrades the existing module in place instead of registering
+    a new one.
   - `trigger_sync_sigma_rules_catalog.json` — `uuid` updated to
     `349e50ff-f44f-420d-a09e-7567997ddd62`.
   - `pyproject.toml` — package name `nextron-valhalla-sigma-rules`,
@@ -26,11 +29,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `NextronValhallaSigmaRulesModule` and its configuration class
     likewise renamed.
   - `sigma_mapper.py` — `MARKER_TAG` constant
-    `"valhalla-integration"` → `"nextron-valhalla"`. **Consequence:**
-    the delete-catalog trigger keys off `MARKER_TAG`, so rules previously
-    pushed under the old tag need a one-time manual cleanup (or a
-    delete pass with `marker_tag="valhalla-integration"` configured)
-    before the new tag takes over.
+    `"valhalla-integration"` → `"nextron-valhalla"`.
+    `trigger_delete_catalog_rules.json` `marker_tag.default` and
+    description updated to match. **Consequence:** the delete-catalog
+    trigger keys off `MARKER_TAG`, so rules previously pushed under the
+    old tag need a one-time manual cleanup (or a delete pass with
+    `marker_tag="valhalla-integration"` configured) before the new tag
+    takes over.
+  - `trigger_delete_catalog_rules.json` — trigger `uuid` regenerated to
+    `9bec2df2-27ef-4c86-a1ea-74a61a6880e2` (previous
+    `16cdbf11-…` collided with an existing entry in Sekoia's DB).
   - `logo.svg` — replaced with the official Nextron Valhalla brand mark.
 - Kept as module-only divergence from source of truth (per plan): the
   `delete-catalog-rules` trigger with its JSON, tests, and the extended
