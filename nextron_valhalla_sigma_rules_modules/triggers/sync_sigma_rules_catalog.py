@@ -5,12 +5,12 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from sekoia_automation.storage import PersistentJSON
 from sekoia_automation.trigger import Trigger
 
-from sekoia_valhalla_integration_modules.client import ValhallaClient
-from sekoia_valhalla_integration_modules.sekoia_client import (
+from nextron_valhalla_sigma_rules_modules.client import ValhallaClient
+from nextron_valhalla_sigma_rules_modules.sekoia_client import (
     SekoiaClient,
     SekoiaRuleNotFoundError,
 )
-from sekoia_valhalla_integration_modules.sigma_mapper import (
+from nextron_valhalla_sigma_rules_modules.sigma_mapper import (
     SEVERITY_MAP,
     STATUS_EFFORT_MAP,
     convert_parsed_to_ecs,

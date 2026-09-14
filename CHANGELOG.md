@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-09-14
+
+### Changed
+- **Aligned dev workspace with source-of-truth
+  `automation-library/Nextron Valhalla Sigma Rules/`.** Module identity
+  rebranded to Nextron Valhalla Sigma Rules for the Sekoia catalog listing:
+  - `manifest.json` — `name`, `slug`, `uuid`
+    (`a81edea4-3259-4c20-b68d-0bdc923349d7`), `description`,
+    `configuration.title`, and `sekoia_api_key` description now match the
+    shipped module. Version jumped from `0.11.3` → `1.0.2`.
+  - `trigger_sync_sigma_rules_catalog.json` — `uuid` updated to
+    `349e50ff-f44f-420d-a09e-7567997ddd62`.
+  - `pyproject.toml` — package name `nextron-valhalla-sigma-rules`,
+    version `1.0.2`, coverage target renamed accordingly.
+  - Python package `sekoia_valhalla_integration_modules/` renamed to
+    `nextron_valhalla_sigma_rules_modules/`; every import in `main.py`,
+    the package internals, `tests/`, and `scripts/` updated. Module
+    class `SekoiaValhallaIntegrationModule` →
+    `NextronValhallaSigmaRulesModule` and its configuration class
+    likewise renamed.
+  - `sigma_mapper.py` — `MARKER_TAG` constant
+    `"valhalla-integration"` → `"nextron-valhalla"`. **Consequence:**
+    the delete-catalog trigger keys off `MARKER_TAG`, so rules previously
+    pushed under the old tag need a one-time manual cleanup (or a
+    delete pass with `marker_tag="valhalla-integration"` configured)
+    before the new tag takes over.
+  - `logo.svg` — replaced with the official Nextron Valhalla brand mark.
+- Kept as module-only divergence from source of truth (per plan): the
+  `delete-catalog-rules` trigger with its JSON, tests, and the extended
+  `sekoia_client.py` (`delete_rule`, `iter_rules`,
+  `LIST_PAGE_SIZE`, `MAX_LIST_PAGES`); dev-only directories `docs/`,
+  `e2e-subplans/`, `scripts/`; `.gitignore`; `.dockerignore`.
+
 ## Unreleased
 
 ### Removed

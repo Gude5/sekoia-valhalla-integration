@@ -5,8 +5,8 @@ from typing import Iterable
 from apscheduler.schedulers.blocking import BlockingScheduler
 from sekoia_automation.trigger import Trigger
 
-from sekoia_valhalla_integration_modules.sekoia_client import SekoiaClient
-from sekoia_valhalla_integration_modules.sigma_mapper import MARKER_TAG
+from nextron_valhalla_sigma_rules_modules.sekoia_client import SekoiaClient
+from nextron_valhalla_sigma_rules_modules.sigma_mapper import MARKER_TAG
 
 SAMPLE_UUIDS_LOGGED = 5
 DIAGNOSTIC_SAMPLE_SIZE = 200
@@ -40,7 +40,7 @@ class DeleteCatalogRules(Trigger):
     created.
 
     Default mode (**tag mode**): filters by the marker tag the sync
-    trigger attaches to every rule it POSTs (``valhalla-integration``).
+    trigger attaches to every rule it POSTs (``nextron-valhalla``).
     This is stable across Sekoia API-key rotations — unlike ``created_by``.
 
     Advanced mode (**field mode**): set ``marker_tag`` to empty and

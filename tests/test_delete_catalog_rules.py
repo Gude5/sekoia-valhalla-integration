@@ -3,8 +3,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from sekoia_valhalla_integration_modules.sigma_mapper import MARKER_TAG
-from sekoia_valhalla_integration_modules.triggers.delete_catalog_rules import (
+from nextron_valhalla_sigma_rules_modules.sigma_mapper import MARKER_TAG
+from nextron_valhalla_sigma_rules_modules.triggers.delete_catalog_rules import (
     DEFAULT_MATCH_FIELD,
     DeleteCatalogRules,
 )

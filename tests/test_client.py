@@ -1,7 +1,7 @@
 import pytest
 import requests_mock
 
-from sekoia_valhalla_integration_modules.client import (
+from nextron_valhalla_sigma_rules_modules.client import (
     VALHALLA_BASE_URL,
     ValhallaClient,
 )
