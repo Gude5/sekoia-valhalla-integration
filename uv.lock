@@ -637,6 +637,39 @@ wheels = [
 ]
 
 [[package]]
+name = "nextron-valhalla-sigma-rules"
+version = "1.0.2"
+source = { virtual = "." }
+dependencies = [
+    { name = "apscheduler" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "sekoia-automation-sdk" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "requests-mock" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "apscheduler", specifier = ">=3.10,<4" },
+    { name = "pyyaml", specifier = ">=6.0,<7" },
+    { name = "requests", specifier = ">=2.34.2,<3" },
+    { name = "sekoia-automation-sdk", specifier = ">=1.23.1,<2" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "requests-mock" },
+]
+
+[[package]]
 name = "orjson"
 version = "3.11.9"
 source = { registry = "https://pypi.org/simple" }
@@ -1127,39 +1160,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a6/ec/469ab1751f1375075d6c488e475be0c2f90b8643b6bc21be12a5a02fd3ac/sekoia_automation_sdk-1.23.1.tar.gz", hash = "sha256:500d2b27ba836411387cf9f339539bfdb4f976d709b9847e10c64d9724ad3e05", size = 65281, upload-time = "2026-06-08T07:32:57.52Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/28/cd/ba6fe6bb924d0969986ee0d74c852bf64a1375383652c9a197600c06fb30/sekoia_automation_sdk-1.23.1-py3-none-any.whl", hash = "sha256:b13a143b8794c188bb900b3e2c3ecbf3b4eeb38b476790f3bdefe6ed52075ebc", size = 96485, upload-time = "2026-06-08T07:32:56.321Z" },
-]
-
-[[package]]
-name = "sekoia-valhalla-integration-automation-module"
-version = "0.11.3"
-source = { virtual = "." }
-dependencies = [
-    { name = "apscheduler" },
-    { name = "pyyaml" },
-    { name = "requests" },
-    { name = "sekoia-automation-sdk" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "requests-mock" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "apscheduler", specifier = ">=3.10,<4" },
-    { name = "pyyaml", specifier = ">=6.0,<7" },
-    { name = "requests", specifier = ">=2.34.2,<3" },
-    { name = "sekoia-automation-sdk", specifier = ">=1.23.1,<2" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "requests-mock" },
 ]
 
 [[package]]

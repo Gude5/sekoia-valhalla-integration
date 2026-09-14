@@ -3,7 +3,7 @@ from typing import Optional
 
 import yaml
 
-from sekoia_valhalla_integration_modules.ecs_field_maps import (
+from nextron_valhalla_sigma_rules_modules.ecs_field_maps import (
     CONTEXT_AWARE_FIELDS,
     RAW_TO_ECS,
     _ECS_PASSTHROUGH_FIELDS,
@@ -43,7 +43,7 @@ _TRUNCATION_MARKER = "…"
 # Marker tag appended to every rule the sync trigger POSTs. Used by the
 # delete trigger as the discriminator for "rules this integration created".
 # Stable across Sekoia API-key rotations (unlike ``created_by``).
-MARKER_TAG = "valhalla-integration"
+MARKER_TAG = "nextron-valhalla"
 
 # Sekoia alert-type UUIDs are stable across tenants (Ecsirt-standard
 # taxonomy). We derive an ``alert_type_uuid`` per rule from its Sigma

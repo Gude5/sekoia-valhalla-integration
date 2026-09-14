@@ -4,10 +4,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from sekoia_valhalla_integration_modules.sekoia_client import (
+from nextron_valhalla_sigma_rules_modules.sekoia_client import (
     SekoiaRuleNotFoundError,
 )
-from sekoia_valhalla_integration_modules.triggers.sync_sigma_rules_catalog import (
+from nextron_valhalla_sigma_rules_modules.triggers.sync_sigma_rules_catalog import (
     UUID_MAP_FILE,
     SyncSigmaRulesCatalog,
 )

@@ -1,5 +1,5 @@
 {
-  "uuid": "63e70b43-1b67-4acb-853c-e40c8fe60a39",
+  "uuid": "349e50ff-f44f-420d-a09e-7567997ddd62",
   "name": "Sync Valhalla Sigma rules into Sekoia Rules Catalog",
   "description": "Periodically pulls the Valhalla Sigma feed and POSTs each rule to the Sekoia Rules Catalog so it executes in the detection engine. POST on first seen, PUT on subsequent pulls.",
   "docker_parameters": "sync-sigma-rules-catalog",

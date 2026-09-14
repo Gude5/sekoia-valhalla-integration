@@ -1,6 +1,6 @@
 [project]
-name = "sekoia-valhalla-integration-automation-module"
-version = "0.11.3"
+name = "nextron-valhalla-sigma-rules"
+version = "1.0.2"
 description = "Syncs the Nextron Valhalla Sigma feed into the Sekoia Rules Catalog"
 authors = []
 requires-python = ">=3.11,<3.13"
@@ -52,7 +52,7 @@ testpaths = ["tests"]
 addopts = '''
   --strict-markers
   --tb=short
-  --cov=sekoia_valhalla_integration_modules
+  --cov=nextron_valhalla_sigma_rules_modules
   --cov-branch
   --cache-clear
   --cov-report=html

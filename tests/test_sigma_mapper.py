@@ -3,7 +3,7 @@ import textwrap
 import pytest
 import yaml
 
-from sekoia_valhalla_integration_modules.sigma_mapper import (
+from nextron_valhalla_sigma_rules_modules.sigma_mapper import (
     DEFAULT_EFFORT,
     DEFAULT_SEVERITY,
     MARKER_TAG,
@@ -348,7 +348,7 @@ def test_all_optional_fields_together():
 # ---------------------------------------------------------------------------
 
 
-from sekoia_valhalla_integration_modules.sigma_mapper import (  # noqa: E402
+from nextron_valhalla_sigma_rules_modules.sigma_mapper import (  # noqa: E402
     DEFAULT_ALERT_UUID,
     TAG_ALERT_UUID_MAP,
     derive_alert_type_uuid,
@@ -396,9 +396,9 @@ def test_non_string_tag_entries_are_ignored():
 
 
 def test_marker_tag_alone_does_not_override_default():
-    # MARKER_TAG (valhalla-integration) must not accidentally match any
+    # MARKER_TAG (nextron-valhalla) must not accidentally match any
     # priority-list entry.
-    from sekoia_valhalla_integration_modules.sigma_mapper import MARKER_TAG
+    from nextron_valhalla_sigma_rules_modules.sigma_mapper import MARKER_TAG
     assert derive_alert_type_uuid([MARKER_TAG]) == DEFAULT_ALERT_UUID
 
 
@@ -772,7 +772,7 @@ def test_windows_wins_shared_field_names_over_macos():
     and macOS pipelines with different targets. The merge order puts
     Windows first so Windows-appropriate ECS targets win — Valhalla's
     feed is majority Windows."""
-    from sekoia_valhalla_integration_modules.ecs_field_maps import (
+    from nextron_valhalla_sigma_rules_modules.ecs_field_maps import (
         RAW_TO_ECS_SIGMAHQ_MACOS,
         RAW_TO_ECS_SIGMAHQ_WINDOWS,
     )
@@ -785,7 +785,7 @@ def test_windows_wins_shared_field_names_over_macos():
 
 
 def test_custom_map_fills_gaps_windows_pipeline_doesnt_cover():
-    from sekoia_valhalla_integration_modules.ecs_field_maps import (
+    from nextron_valhalla_sigma_rules_modules.ecs_field_maps import (
         RAW_TO_ECS_CUSTOM,
         RAW_TO_ECS_SIGMAHQ_WINDOWS,
     )

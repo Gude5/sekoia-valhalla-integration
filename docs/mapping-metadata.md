@@ -8,7 +8,7 @@ Every Valhalla Sigma rule is broken into two parts before it lands in Sekoia:
 2. **The `detection:` block** → kept in `payload` after ECS field-name
    conversion. See [mapping-ecs.md](mapping-ecs.md).
 
-Implementation: [`sigma_rule_to_catalog_payload()`](../sekoia_valhalla_integration_modules/sigma_mapper.py) in `sigma_mapper.py`.
+Implementation: [`sigma_rule_to_catalog_payload()`](../nextron_valhalla_sigma_rules_modules/sigma_mapper.py) in `sigma_mapper.py`.
 
 ## Fields always shipped
 

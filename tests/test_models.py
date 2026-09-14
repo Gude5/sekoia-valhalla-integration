@@ -5,10 +5,10 @@ import pytest
 from pydantic import ValidationError
 from sekoia_automation.module import ModuleConfigurationError
 
-from sekoia_valhalla_integration_modules import SekoiaValhallaIntegrationModule
-from sekoia_valhalla_integration_modules.models import (
+from nextron_valhalla_sigma_rules_modules import NextronValhallaSigmaRulesModule
+from nextron_valhalla_sigma_rules_modules.models import (
     DEMO_API_KEY,
-    SekoiaValhallaIntegrationModuleConfiguration as ModuleConfig,
+    NextronValhallaSigmaRulesModuleConfiguration as ModuleConfig,
 )
 
 MANIFEST = Path(__file__).resolve().parent.parent / "manifest.json"
@@ -99,13 +99,13 @@ def test_module_rejects_unusable_credentials(configuration):
     trigger runs, so Sekoia reports a configuration problem instead of the
     module burning a full sync on 401s. The omitted case is caught by the
     manifest layer, the blank cases by the model validator."""
-    module = SekoiaValhallaIntegrationModule()
+    module = NextronValhallaSigmaRulesModule()
     with pytest.raises(ModuleConfigurationError):
         module.configuration = configuration
 
 
 def test_module_accepts_a_valid_configuration():
-    module = SekoiaValhallaIntegrationModule()
+    module = NextronValhallaSigmaRulesModule()
     module.configuration = {"sekoia_api_key": f"  {A_KEY}\n"}
     assert module.configuration.sekoia_api_key == A_KEY
 

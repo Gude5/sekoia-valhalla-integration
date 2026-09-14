@@ -10,7 +10,7 @@ Rules that reference any field NOT in the mapping (or a Stage-2 branch)
 are skipped — their unmapped field names roll up into the
 `top_unmapped` histogram on the sync summary event.
 
-Implementation: [`convert_payload_to_ecs()`](../sekoia_valhalla_integration_modules/sigma_mapper.py)
+Implementation: [`convert_payload_to_ecs()`](../nextron_valhalla_sigma_rules_modules/sigma_mapper.py)
 in `sigma_mapper.py`. Sigma field modifiers (`|contains`, `|endswith`,
 `|re`, `|base64offset`, chained combinations) are preserved on the
 ECS-renamed field.

@@ -1,7 +1,7 @@
 {
   "configuration": {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Sekoia Valhalla Integration",
+    "title": "Nextron Valhalla Sigma Rules",
     "type": "object",
     "properties": {
       "valhalla_api_key": {
@@ -13,7 +13,7 @@
       "sekoia_api_key": {
         "type": "string",
         "title": "Sekoia API key",
-        "description": "Bearer token from Sekoia (Settings → Workspace → API Keys). Required only for the Rules Catalog trigger."
+        "description": "Bearer token from Sekoia (Settings → Workspace → API Keys). Used to push rules into the Sekoia Rules Catalog."
       },
       "sekoia_base_url": {
         "type": "string",
@@ -25,10 +25,10 @@
     "required": ["sekoia_api_key"],
     "secrets": ["valhalla_api_key", "sekoia_api_key"]
   },
-  "description": "Integration of Valhalla into Sekoia",
-  "name": "Sekoia Valhalla Integration",
-  "slug": "sekoia-valhalla-integration",
+  "description": "Nextron Valhalla Sigma Rules integration for Sekoia XDR",
+  "name": "Nextron Valhalla Sigma Rules",
+  "slug": "nextron-valhalla-sigma-rules",
   "categories": ["Threat Intelligence"],
-  "uuid": "fde151ac-16c7-4d2b-9444-c4a22cd0437e",
-  "version": "0.11.3"
+  "uuid": "a81edea4-3259-4c20-b68d-0bdc923349d7",
+  "version": "1.0.2"
 }
