@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.2.1 - 2026-10-13
+
+### Changed
+- Per-rule overwrite opt-out is now driven by a list of rule names instead
+  of a tag. The `preserve_tag` trigger argument (string, defaulted to
+  `"nextron-valhalla-keep-custom"`) is replaced with `preserve_rule_names`
+  (array of strings, empty by default). Rationale: the Sekoia Rules
+  Catalog UI does not let users edit a rule's tags, so the tag-based
+  opt-out was unreachable in practice. Operators now copy the exact rule
+  name from the UI into the list. Match is case-sensitive; surrounding
+  whitespace is tolerated. Upgrading: any `preserve_tag` value stored on
+  existing trigger instances is ignored silently; no rules are preserved
+  until operators populate `preserve_rule_names`.
+
 ## 1.2.0 - 2026-10-13
 
 ### Added

@@ -40,11 +40,12 @@
         "description": "When Nextron removes a rule from the Valhalla feed (deprecated, superseded, withdrawn) — or when a rule newly drops below your configured minimum level/status — the sync disables it in the Sekoia catalog by setting enabled=false. The rule is NOT deleted: it stays in the catalog so you can inspect it, and if Nextron re-publishes it later the sync resumes updating in place. Default false — dry-run that only counts how many rules WOULD be disabled (see the `to_disable` field on the summary event). Set to true to actually disable.",
         "default": false
       },
-      "preserve_tag": {
-        "type": "string",
-        "title": "Preserve tag (per-rule opt-out)",
-        "description": "A rule in the Sekoia catalog that carries a tag with this exact name is NOT overwritten with Valhalla's content on subsequent syncs. Use it to protect hand-tuned rules: edit the rule in the Sekoia UI, add this tag, and future syncs will skip the PUT for that rule (counted under `preserved` on the summary event). Leave empty to disable the per-rule check (every existing rule is updated from Valhalla as usual). The `disable_removed` pass still runs on preserved rules — it only flips `enabled` and keeps hand-edited content intact.",
-        "default": "nextron-valhalla-keep-custom"
+      "preserve_rule_names": {
+        "type": "array",
+        "title": "Preserve rule names (per-rule opt-out)",
+        "description": "Rules whose exact name appears in this list are NOT overwritten with Valhalla's content on subsequent syncs. Use it to protect hand-tuned rules: copy the rule's name from the Sekoia Rules Catalog UI into this list, and future syncs will skip the PUT for that rule (counted under `preserved` on the summary event). Match is exact and case-sensitive; surrounding whitespace is tolerated. Leave empty (default) to disable the per-rule check. The `disable_removed` pass still runs on preserved rules — it only flips `enabled` and keeps hand-edited content intact.",
+        "items": { "type": "string" },
+        "default": []
       }
     },
     "required": []
