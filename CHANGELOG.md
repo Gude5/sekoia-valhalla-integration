@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.3.0 - 2026-10-13
+
+### Added
+- Per-rule marker tag `uuid-<valhalla_id>` on every POST and PUT, plus a
+  catalog scan at the start of every sync that rebuilds the local
+  valhalla_id → sekoia_uuid id-map from the server's own tags. Makes the
+  Sekoia catalog authoritative instead of the trigger's local JSON file.
+  Reason: the id-map lives in the SDK's per-trigger-instance `data_path`,
+  so a sync run from a second playbook (or a trigger that was deleted
+  and re-created) started from an empty id-map, treated every Valhalla
+  rule as new, and POSTed duplicates alongside the tenant's existing
+  copies. The scan recovers the mapping from the server itself so a
+  fresh trigger instance no longer duplicates. New summary-event
+  counters: `server_marker_count`, `duplicate_markers`,
+  `local_overridden`. Duplicate `uuid-*` tags on more than one catalog
+  rule are logged with both UUIDs so the operator can delete the
+  leftover in the Sekoia UI.
+
+### Changed
+- Upgrading from 1.2.x with pre-existing synced rules: the first sync
+  after the upgrade GET+PUTs each rule in the local id-map, which
+  backfills the new `uuid-*` tag onto them. After that, any additional
+  playbook running the same sync will pick the mapping up from the
+  catalog instead of duplicating. If the local id-map was already lost
+  before upgrading (e.g. after a trigger recreation), delete the
+  existing synced rules in the Sekoia UI before running the first sync
+  on this version — otherwise the sync has no handle on them and will
+  POST fresh copies.
+
 ## 1.2.1 - 2026-10-13
 
 ### Changed

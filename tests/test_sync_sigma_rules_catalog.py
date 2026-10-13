@@ -45,6 +45,9 @@ def trigger(data_storage):
     # (matches _enabled=False default so update-path tests see the same
     # body["enabled"] value the pre-get-rule code used to send).
     t._sekoia.get_rule.return_value = {"enabled": False}
+    # Empty catalog scan by default: no server-side marker-tagged rules.
+    # Tests exercising the scan override this per-case.
+    t._sekoia.iter_rules.return_value = []
     t._enabled = False
     t._disable_removed = False
     t._preserve_rule_names = frozenset()
@@ -104,6 +107,9 @@ def test_second_sync_puts_existing_rules(trigger):
         "skipped_filter": 0,
         "total_rules": 2,
         "top_unmapped": {},
+        "server_marker_count": 0,
+        "duplicate_markers": 0,
+        "local_overridden": 0,
         "to_disable": 0,
         "newly_disabled": 0,
         "already_disabled": 0,
@@ -683,6 +689,157 @@ def test_disable_pass_still_fires_on_preserved_rule(trigger, data_storage):
         if c.args[1].get("enabled") is False
     ]
     assert len(disable_puts) == 1
+
+
+# ---------------------------------------------------------------------------
+# Catalog scan — rebuild id-map from server-side uuid-* tags
+# ---------------------------------------------------------------------------
+
+
+def test_scan_builds_id_map_from_uuid_tags(trigger, data_storage):
+    """Fresh id-map, server already carries uuid tags → id-map is rebuilt
+    from the catalog, so the sync loop PUTs (no POSTs, no duplicates)."""
+    trigger._sekoia.iter_rules.return_value = [
+        {
+            "uuid": "sekoia-A",
+            "tags": ["nextron-valhalla", "uuid-valhalla-a"],
+        },
+        {
+            "uuid": "sekoia-B",
+            "tags": ["nextron-valhalla", "uuid-valhalla-b"],
+        },
+    ]
+    # get_rule by default returns {"enabled": False} — fine for update path.
+
+    trigger._sync_once()
+
+    assert trigger._sekoia.create_rule.call_count == 0
+    assert trigger._sekoia.update_rule.call_count == 2
+    event = trigger.send_event.call_args.kwargs["event"]
+    assert event["server_marker_count"] == 2
+    assert event["duplicate_markers"] == 0
+    assert event["local_overridden"] == 0
+    id_map = json.loads((Path(data_storage) / UUID_MAP_FILE).read_text())
+    assert id_map == {"valhalla-a": "sekoia-A", "valhalla-b": "sekoia-B"}
+
+
+def test_scan_detects_duplicate_markers(trigger):
+    """Two server rules carrying the same uuid-X tag → warning logged,
+    first-seen wins, counter increments."""
+    trigger._sekoia.iter_rules.return_value = [
+        {
+            "uuid": "sekoia-A-original",
+            "tags": ["nextron-valhalla", "uuid-valhalla-a"],
+        },
+        {
+            "uuid": "sekoia-A-duplicate",
+            "tags": ["nextron-valhalla", "uuid-valhalla-a"],
+        },
+    ]
+    trigger.log = MagicMock()
+
+    trigger._sync_once()
+
+    event = trigger.send_event.call_args.kwargs["event"]
+    assert event["duplicate_markers"] == 1
+    assert event["server_marker_count"] == 1  # first-seen only
+    # First-seen UUID is the one that ends up in the sync path.
+    assert trigger._sekoia.update_rule.call_args_list[0].args[0] == "sekoia-A-original"
+    # Warning was logged with both uuids and the clean-up hint.
+    warnings = [
+        c for c in trigger.log.call_args_list if c.kwargs.get("level") == "warning"
+    ]
+    assert any("sekoia-A-duplicate" in str(c) for c in warnings)
+
+
+def test_scan_overrides_local_on_conflict(trigger, data_storage):
+    """Local id-map says valhalla-a → stale-uuid; catalog says fresh-uuid.
+    Scan trusts the catalog; local_overridden counter increments."""
+    (Path(data_storage) / UUID_MAP_FILE).write_text(
+        json.dumps({"valhalla-a": "stale-uuid"})
+    )
+    trigger._sekoia.iter_rules.return_value = [
+        {
+            "uuid": "fresh-uuid",
+            "tags": ["nextron-valhalla", "uuid-valhalla-a"],
+        },
+    ]
+    # Narrow the feed to one rule so this test asserts a single update path.
+    trigger._valhalla.get_sigma_feed.return_value = [SAMPLE_RULES[0]]
+    trigger.log = MagicMock()
+
+    trigger._sync_once()
+
+    event = trigger.send_event.call_args.kwargs["event"]
+    assert event["local_overridden"] == 1
+    assert trigger._sekoia.update_rule.call_args.args[0] == "fresh-uuid"
+    id_map = json.loads((Path(data_storage) / UUID_MAP_FILE).read_text())
+    assert id_map["valhalla-a"] == "fresh-uuid"
+
+
+def test_scan_ignores_rules_without_marker_tag(trigger):
+    """Server rules that lack the ``nextron-valhalla`` marker (unrelated
+    user-created rules) are skipped by the scan — not added to id-map."""
+    trigger._sekoia.iter_rules.return_value = [
+        {"uuid": "foreign-rule", "tags": ["uuid-valhalla-a"]},  # no marker tag
+        {"uuid": "another-foreign", "tags": ["attack.t1059"]},
+    ]
+
+    trigger._sync_once()
+
+    event = trigger.send_event.call_args.kwargs["event"]
+    assert event["server_marker_count"] == 0
+    # The Valhalla rules go through the POST branch since nothing in the
+    # scan claimed them.
+    assert trigger._sekoia.create_rule.call_count == 2
+
+
+def test_scan_ignores_marker_rules_without_uuid_tag(trigger):
+    """Server rules carrying the integration marker but no uuid-* tag
+    (legacy rules from before this fix) are skipped by the scan. They
+    stay orphaned until the operator deletes them manually — intentional
+    per project decision: cleanup is a manual step, not auto-reclaimed."""
+    trigger._sekoia.iter_rules.return_value = [
+        {"uuid": "legacy-rule", "tags": ["nextron-valhalla", "attack.t1059"]},
+    ]
+
+    trigger._sync_once()
+
+    event = trigger.send_event.call_args.kwargs["event"]
+    assert event["server_marker_count"] == 0
+
+
+def test_scan_accepts_dict_shape_tags(trigger, data_storage):
+    """Sekoia's GET-returned tags shape is ``[{uuid, name}, …]``. The scan
+    reads either shape (dict or plain string)."""
+    trigger._sekoia.iter_rules.return_value = [
+        {
+            "uuid": "sekoia-A",
+            "tags": [
+                {"uuid": "t1", "name": "nextron-valhalla"},
+                {"uuid": "t2", "name": "uuid-valhalla-a"},
+            ],
+        },
+    ]
+    trigger._valhalla.get_sigma_feed.return_value = [SAMPLE_RULES[0]]
+
+    trigger._sync_once()
+
+    event = trigger.send_event.call_args.kwargs["event"]
+    assert event["server_marker_count"] == 1
+    id_map = json.loads((Path(data_storage) / UUID_MAP_FILE).read_text())
+    assert id_map["valhalla-a"] == "sekoia-A"
+
+
+def test_posted_body_carries_uuid_tag(trigger):
+    """A brand-new rule POST includes the per-rule uuid-* tag so a
+    future scan from any playbook can rebuild the mapping."""
+    trigger._sync_once()
+
+    posted = trigger._sekoia.create_rule.call_args_list[0].args[0]
+    tag_names = posted["tags"]
+    assert "nextron-valhalla" in tag_names
+    assert "uuid-valhalla-a" in tag_names
 
 
 # ---------------------------------------------------------------------------

@@ -11,8 +11,10 @@ from nextron_valhalla_sigma_rules_modules.sekoia_client import (
 )
 from nextron_valhalla_sigma_rules_modules.sigma_mapper import (
     DEFAULT_ALERT_UUID,
+    MARKER_TAG,
     SEVERITY_MAP,
     STATUS_EFFORT_MAP,
+    UUID_TAG_PREFIX,
     convert_parsed_to_ecs,
     sigma_rule_to_catalog_payload,
 )
@@ -34,6 +36,39 @@ def _normalize_names(names) -> frozenset[str]:
         return frozenset()
     return frozenset(
         n.strip() for n in names if isinstance(n, str) and n.strip()
+    )
+
+
+def _tag_name(tag) -> str:
+    """Return the string name from either tag shape.
+
+    Sekoia's GET on a rule returns tags as ``[{"uuid": ..., "name": ...}, …]``
+    while our POST/PUT body sends plain strings. Both shapes carry the
+    same identifying string in different places; this helper reads either.
+    """
+    if isinstance(tag, dict):
+        return tag.get("name") or ""
+    if isinstance(tag, str):
+        return tag
+    return ""
+
+
+def _extract_valhalla_id(server_rule: dict) -> str | None:
+    """Return the Valhalla UUID encoded in the rule's tags, or ``None`` if
+    no ``uuid-*`` tag is present."""
+    for tag in server_rule.get("tags") or []:
+        name = _tag_name(tag)
+        if name.startswith(UUID_TAG_PREFIX):
+            return name[len(UUID_TAG_PREFIX):]
+    return None
+
+
+def _has_integration_marker(server_rule: dict) -> bool:
+    """True when the server rule carries the ``nextron-valhalla`` tag —
+    the discriminator used to decide 'this rule was created by this
+    integration'."""
+    return any(
+        _tag_name(t) == MARKER_TAG for t in server_rule.get("tags") or []
     )
 
 # Fields the Sekoia Rules Catalog PUT endpoint accepts. Sekoia's GET
@@ -159,6 +194,7 @@ class SyncSigmaRulesCatalog(Trigger):
         seen_in_feed: set[str] = set()
         passed_filter: set[str] = set()
         with PersistentJSON(UUID_MAP_FILE, self.data_path) as id_map:
+            scan_stats = self._rebuild_id_map_from_catalog(id_map)
             for rule in rules:
                 valhalla_id = rule.get("id")
                 if not valhalla_id:
@@ -252,6 +288,7 @@ class SyncSigmaRulesCatalog(Trigger):
             f"preserved={preserved} failed={failed} "
             f"skipped_unmapped={skipped_unmapped} "
             f"filtered_out={filtered_out} total_rules={len(rules)} "
+            f"scan={scan_stats} "
             f"disable_counts={disable_counts} "
             f"top_unmapped={top_unmapped}",
             level="info",
@@ -267,9 +304,72 @@ class SyncSigmaRulesCatalog(Trigger):
                 "skipped_filter": filtered_out,
                 "total_rules": len(rules),
                 "top_unmapped": top_unmapped,
+                **scan_stats,
                 **disable_counts,
             },
         )
+
+    def _rebuild_id_map_from_catalog(self, id_map) -> dict:
+        """Reconcile the local id-map with the Sekoia catalog.
+
+        Scans every catalog rule once per sync. For each rule carrying the
+        integration marker tag (``nextron-valhalla``) and a ``uuid-*`` tag,
+        we extract the Valhalla UUID and build a server-side view of the
+        mapping. That server view is then merged into the local id-map
+        (catalog wins on conflict).
+
+        This makes the catalog authoritative instead of the local file,
+        which is important when the same Sekoia tenant is synced by more
+        than one playbook / trigger instance: without the scan each trigger
+        would see every Valhalla rule as "new" on its first run and POST
+        duplicates. With the scan, a fresh trigger instance picks up the
+        existing mappings on its first sync.
+
+        Returns stats intended for the summary event:
+        ``server_marker_count`` (rules we recognised), ``duplicate_markers``
+        (same ``uuid-X`` on more than one server rule — operator must
+        clean up manually), and ``local_overridden`` (local id-map
+        entries the server disagreed with).
+        """
+        server_by_vid: dict[str, str] = {}
+        duplicate_markers = 0
+        for rule in self._sekoia.iter_rules():
+            if not _has_integration_marker(rule):
+                continue
+            sekoia_uuid = rule.get("uuid")
+            if not sekoia_uuid:
+                continue
+            vid = _extract_valhalla_id(rule)
+            if not vid:
+                continue
+            if vid in server_by_vid:
+                duplicate_markers += 1
+                self.log(
+                    f"Duplicate catalog rules carry the same marker uuid-{vid}: "
+                    f"keeping {server_by_vid[vid]!r}, duplicate at "
+                    f"{sekoia_uuid!r}. Delete the duplicate in the Sekoia UI.",
+                    level="warning",
+                )
+                continue
+            server_by_vid[vid] = sekoia_uuid
+
+        local_overridden = 0
+        for vid, uuid_val in server_by_vid.items():
+            if vid in id_map and id_map[vid] != uuid_val:
+                local_overridden += 1
+                self.log(
+                    f"Local id-map disagreed with catalog for uuid-{vid}: "
+                    f"local={id_map[vid]!r}, catalog={uuid_val!r}. "
+                    f"Trusting catalog.",
+                    level="warning",
+                )
+            id_map[vid] = uuid_val
+
+        return {
+            "server_marker_count": len(server_by_vid),
+            "duplicate_markers": duplicate_markers,
+            "local_overridden": local_overridden,
+        }
 
     def _disable_removed_rules(
         self,

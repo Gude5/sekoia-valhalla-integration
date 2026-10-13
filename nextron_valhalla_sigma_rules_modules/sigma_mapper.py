@@ -45,6 +45,13 @@ _TRUNCATION_MARKER = "…"
 # Stable across Sekoia API-key rotations (unlike ``created_by``).
 MARKER_TAG = "nextron-valhalla"
 
+# Per-rule tag prefix carrying the Valhalla rule UUID. Lets the sync trigger
+# recover the valhalla_id → sekoia_uuid mapping from the catalog itself when
+# the local id-map is empty (fresh playbook, recreated trigger instance,
+# wiped data volume). Prefix uses ``-`` instead of ``:`` to stay inside the
+# character set Sekoia accepts on tag names.
+UUID_TAG_PREFIX = "uuid-"
+
 # Sekoia alert-type UUIDs are stable across tenants (Ecsirt-standard
 # taxonomy). We derive an ``alert_type_uuid`` per rule from its Sigma
 # MITRE tactic tags rather than requiring a user-supplied config value.
@@ -409,6 +416,11 @@ def sigma_rule_to_catalog_payload(
     tags = list(parsed.get("tags") or [])
     if MARKER_TAG not in tags:
         tags.append(MARKER_TAG)
+    valhalla_id = rule.get("id")
+    if valhalla_id:
+        uuid_tag = f"{UUID_TAG_PREFIX}{valhalla_id}"
+        if uuid_tag not in tags:
+            tags.append(uuid_tag)
 
     body: dict = {
         "name": title,
