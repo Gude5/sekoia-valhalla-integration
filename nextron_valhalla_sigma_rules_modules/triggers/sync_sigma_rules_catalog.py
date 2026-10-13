@@ -21,6 +21,43 @@ TOP_UNMAPPED_REPORT = 5
 DEFAULT_MIN_LEVEL = "informational"
 DEFAULT_MIN_STATUS = "experimental"
 
+# Fields the Sekoia Rules Catalog PUT endpoint accepts. Sekoia's GET
+# response additionally carries read-only metadata (`uuid`, `created_at`,
+# `updated_at`, `created_by`, `community_uuid`, …) that PUT rejects, so
+# the disable pass has to re-shape the GET response into this known-good
+# whitelist before sending it back.
+_PUT_FIELDS: tuple[str, ...] = (
+    "name",
+    "type",
+    "description",
+    "payload",
+    "severity",
+    "effort",
+    "alert_type_uuid",
+    "enabled",
+    "tags",
+    "false_positives",
+)
+
+
+def _disable_body_from_server(current: dict) -> dict:
+    """Build a disable PUT body from the server's GET response.
+
+    Copies only the fields the PUT endpoint accepts (see ``_PUT_FIELDS``)
+    and forces ``enabled=False``. Tags are flattened to their names if the
+    server returned the structured ``[{uuid, name}, …]`` shape — PUT expects
+    plain strings.
+    """
+    body: dict = {k: current[k] for k in _PUT_FIELDS if k in current}
+    tags = body.get("tags")
+    if isinstance(tags, list):
+        body["tags"] = [
+            t["name"] if isinstance(t, dict) and "name" in t else t
+            for t in tags
+        ]
+    body["enabled"] = False
+    return body
+
 
 class SyncSigmaRulesCatalog(Trigger):
     def run(self):
@@ -227,6 +264,7 @@ class SyncSigmaRulesCatalog(Trigger):
         already_disabled = 0
         already_gone = 0
         disable_failed = 0
+        first_failure_logged = False
         for vid in candidates:
             sekoia_uuid = id_map[vid]
             try:
@@ -235,20 +273,36 @@ class SyncSigmaRulesCatalog(Trigger):
                 already_gone += 1
                 del id_map[vid]
                 continue
-            except Exception:
+            except Exception as exc:
                 disable_failed += 1
+                if not first_failure_logged:
+                    self.log(
+                        f"First disable-pass failure (GET). "
+                        f"valhalla_id={vid}, sekoia_uuid={sekoia_uuid}. "
+                        f"Error: {exc}",
+                        level="error",
+                    )
+                    first_failure_logged = True
                 continue
             if not current.get("enabled", True):
                 already_disabled += 1
                 continue
             if not self._disable_removed:
                 continue  # dry-run — counted under ``to_disable``
-            current["enabled"] = False
+            disable_body = _disable_body_from_server(current)
             try:
-                self._sekoia.update_rule(sekoia_uuid, current)
+                self._sekoia.update_rule(sekoia_uuid, disable_body)
                 newly_disabled += 1
-            except Exception:
+            except Exception as exc:
                 disable_failed += 1
+                if not first_failure_logged:
+                    self.log(
+                        f"First disable-pass failure (PUT). "
+                        f"valhalla_id={vid}, sekoia_uuid={sekoia_uuid}. "
+                        f"Sent body: {disable_body}. Error: {exc}",
+                        level="error",
+                    )
+                    first_failure_logged = True
         return {
             "to_disable": to_disable,
             "newly_disabled": newly_disabled,

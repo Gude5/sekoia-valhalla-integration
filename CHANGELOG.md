@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.1.1 - 2026-10-13
+
+### Fixed
+- Disable-pass PUT body is built from a whitelist of writable fields
+  (`name`, `type`, `description`, `payload`, `severity`, `effort`,
+  `alert_type_uuid`, `enabled`, `tags`, `false_positives`). 1.1.0 was
+  PUTting the raw GET response back — which carries read-only fields
+  like `uuid`, `created_at`, `community_uuid` — and Sekoia rejected
+  every one with HTTP 400, so `disable_failed` matched `to_disable`
+  while `newly_disabled` stayed at zero. Structured tags
+  (`[{uuid, name}, …]`) are flattened to plain strings on the way out.
+- Disable-pass GET/PUT failures are now logged with the first failure's
+  details (`valhalla_id`, `sekoia_uuid`, body, error) so a repeated
+  100% failure doesn't fail silently.
+
 ## 1.1.0 - 2026-10-13
 
 ### Added

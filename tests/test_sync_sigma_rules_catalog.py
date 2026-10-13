@@ -10,6 +10,7 @@ from nextron_valhalla_sigma_rules_modules.sekoia_client import (
 from nextron_valhalla_sigma_rules_modules.triggers.sync_sigma_rules_catalog import (
     UUID_MAP_FILE,
     SyncSigmaRulesCatalog,
+    _disable_body_from_server,
 )
 
 
@@ -527,6 +528,58 @@ def test_run_exits_after_stop_during_wait(monkeypatch, data_storage):
 # ---------------------------------------------------------------------------
 # disable_removed (should-fix #4)
 # ---------------------------------------------------------------------------
+
+
+def test_disable_body_strips_server_read_only_fields():
+    """Sekoia's GET response carries read-only fields (uuid, created_at,
+    created_by, …) that PUT rejects. The disable pass must strip them
+    before round-tripping or every PUT 400s."""
+    server_body = {
+        "uuid": "sk-1",
+        "created_at": "2026-10-01T00:00:00Z",
+        "created_by": "key-uuid",
+        "updated_at": "2026-10-10T00:00:00Z",
+        "community_uuid": "comm-123",
+        "name": "A rule",
+        "type": "sigma",
+        "description": "desc",
+        "payload": "detection: {}",
+        "severity": 50,
+        "effort": 2,
+        "alert_type_uuid": "alert-uuid",
+        "enabled": True,
+        "tags": ["attack.t1059", "nextron-valhalla"],
+        "false_positives": "noise",
+    }
+    body = _disable_body_from_server(server_body)
+    # Enabled flipped.
+    assert body["enabled"] is False
+    # Writable fields preserved.
+    for k in ("name", "type", "description", "payload", "severity", "effort",
+              "alert_type_uuid", "tags", "false_positives"):
+        assert body[k] == server_body[k], k
+    # Read-only fields stripped.
+    for k in ("uuid", "created_at", "created_by", "updated_at", "community_uuid"):
+        assert k not in body, k
+
+
+def test_disable_body_flattens_structured_tags():
+    """Sekoia returns tags as ``[{uuid, name}, …]`` on GET but PUT expects
+    plain strings. The helper flattens so the round-trip is accepted."""
+    server_body = {
+        "name": "A rule",
+        "type": "sigma",
+        "payload": "detection: {}",
+        "enabled": True,
+        "tags": [
+            {"uuid": "t1", "name": "attack.t1059"},
+            {"uuid": "t2", "name": "nextron-valhalla"},
+            "already-a-string",
+        ],
+    }
+    body = _disable_body_from_server(server_body)
+    assert body["tags"] == ["attack.t1059", "nextron-valhalla", "already-a-string"]
+    assert body["enabled"] is False
 
 
 def test_disable_removed_dry_run_counts_but_doesnt_put(trigger, data_storage):
