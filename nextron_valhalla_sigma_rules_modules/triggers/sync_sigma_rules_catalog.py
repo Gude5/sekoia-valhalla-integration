@@ -10,6 +10,7 @@ from nextron_valhalla_sigma_rules_modules.sekoia_client import (
     SekoiaRuleNotFoundError,
 )
 from nextron_valhalla_sigma_rules_modules.sigma_mapper import (
+    DEFAULT_ALERT_UUID,
     SEVERITY_MAP,
     STATUS_EFFORT_MAP,
     convert_parsed_to_ecs,
@@ -47,6 +48,12 @@ def _disable_body_from_server(current: dict) -> dict:
     and forces ``enabled=False``. Tags are flattened to their names if the
     server returned the structured ``[{uuid, name}, …]`` shape — PUT expects
     plain strings.
+
+    The server's GET often returns the alert type as an expanded object
+    (``"alert_type": {"uuid": ..., "name": ...}``) rather than the flat
+    ``alert_type_uuid`` string the PUT endpoint requires. Normalise it,
+    falling back to ``DEFAULT_ALERT_UUID`` so the disable PUT can't be
+    rejected for a missing required field.
     """
     body: dict = {k: current[k] for k in _PUT_FIELDS if k in current}
     tags = body.get("tags")
@@ -55,6 +62,12 @@ def _disable_body_from_server(current: dict) -> dict:
             t["name"] if isinstance(t, dict) and "name" in t else t
             for t in tags
         ]
+    if "alert_type_uuid" not in body:
+        at = current.get("alert_type")
+        if isinstance(at, dict) and at.get("uuid"):
+            body["alert_type_uuid"] = at["uuid"]
+        else:
+            body["alert_type_uuid"] = DEFAULT_ALERT_UUID
     body["enabled"] = False
     return body
 

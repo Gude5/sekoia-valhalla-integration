@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.1.2 - 2026-10-13
+
+### Fixed
+- Disable-pass PUT now ships `alert_type_uuid`. Sekoia's GET returns the
+  alert type as an expanded object (`"alert_type": {"uuid": ..., "name": ...}`),
+  not the flat `alert_type_uuid` the PUT endpoint requires, so 1.1.1
+  built a body with the field missing and Sekoia rejected every PUT with
+  `VA301 Field required`. The helper now extracts the uuid from the
+  expanded object (or falls back to `DEFAULT_ALERT_UUID`) before PUT.
+
 ## 1.1.1 - 2026-10-13
 
 ### Fixed

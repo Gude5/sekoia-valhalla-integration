@@ -563,6 +563,57 @@ def test_disable_body_strips_server_read_only_fields():
         assert k not in body, k
 
 
+def test_disable_body_normalises_expanded_alert_type_object():
+    """Sekoia's GET returns ``alert_type`` as ``{uuid, name}`` but PUT
+    requires a flat ``alert_type_uuid`` string. Pull the uuid out of the
+    expanded object."""
+    server_body = {
+        "name": "A",
+        "type": "sigma",
+        "payload": "detection: {}",
+        "enabled": True,
+        "alert_type": {
+            "uuid": "0b7c0b5b-da8e-4e43-a2e1-11cb5a40f168",
+            "name": "exfiltration",
+        },
+    }
+    body = _disable_body_from_server(server_body)
+    assert body["alert_type_uuid"] == "0b7c0b5b-da8e-4e43-a2e1-11cb5a40f168"
+    assert "alert_type" not in body
+    assert body["enabled"] is False
+
+
+def test_disable_body_falls_back_to_default_alert_type_when_missing():
+    """If the server returned neither a flat ``alert_type_uuid`` nor an
+    expanded ``alert_type`` object, substitute ``DEFAULT_ALERT_UUID`` so
+    the required-field validator can't reject the PUT."""
+    from nextron_valhalla_sigma_rules_modules.sigma_mapper import DEFAULT_ALERT_UUID
+    server_body = {
+        "name": "A",
+        "type": "sigma",
+        "payload": "detection: {}",
+        "enabled": True,
+    }
+    body = _disable_body_from_server(server_body)
+    assert body["alert_type_uuid"] == DEFAULT_ALERT_UUID
+    assert body["enabled"] is False
+
+
+def test_disable_body_prefers_flat_alert_type_uuid_over_expanded():
+    """When both are present (hypothetical), the flat one wins — it's the
+    shape PUT expects natively."""
+    server_body = {
+        "name": "A",
+        "type": "sigma",
+        "payload": "detection: {}",
+        "enabled": True,
+        "alert_type_uuid": "flat-uuid",
+        "alert_type": {"uuid": "nested-uuid", "name": "x"},
+    }
+    body = _disable_body_from_server(server_body)
+    assert body["alert_type_uuid"] == "flat-uuid"
+
+
 def test_disable_body_flattens_structured_tags():
     """Sekoia returns tags as ``[{uuid, name}, …]`` on GET but PUT expects
     plain strings. The helper flattens so the round-trip is accepted."""
