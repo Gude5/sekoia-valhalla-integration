@@ -44,12 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mypy. `poetry.lock` and `tests/test_lockfiles.py` removed in favour of
   `tests/test_lockfile.py` guarding the uv-only setup. Coverage gate
   raised from 5% to 85%.
-
-### Upgrading from 1.0.x
-Rules already in the catalog that were overwritten with `enabled=false`
-on a prior sync will stay disabled until a user flips them back on in
-the UI. 1.1.0 won't retroactively re-enable them — it just stops
-clobbering the flag going forward.
+- Upgrading from 1.0.x: rules clobbered to `enabled=false` by an earlier
+  version are not re-enabled retroactively — 1.1.0 only stops clobbering
+  going forward. Operators must re-enable such rules in the Sekoia UI.
 
 ## 1.0.2 - 2026-09-14
 
