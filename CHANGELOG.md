@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.2.0 - 2026-10-13
+
+### Added
+- `preserve_tag` sync-trigger argument (default `"nextron-valhalla-keep-custom"`,
+  leave empty to disable). When a rule in the Sekoia catalog carries a tag with
+  this exact name, the sync will NOT overwrite it with Valhalla's content on
+  subsequent runs. Lets operators protect hand-tuned rules by tagging them in
+  the Sekoia UI. Skipped rules are counted in the new `preserved` field on the
+  summary event. The `disable_removed` pass still runs on preserved rules —
+  content stays intact, only `enabled` can flip.
+
+### Changed
+- API key fields (`valhalla_api_key`, `sekoia_api_key`) now carry
+  `"format": "password"` in the module manifest so Sekoia's config UI
+  renders them as masked input instead of clear text. The existing
+  `configuration.secrets` list still handles runtime masking.
+- Sync-trigger default thresholds raised: `min_sigma_level` default is
+  now `medium` (was `informational`) and `min_sigma_status` default is
+  now `stable` (was `experimental`). New playbook triggers start out
+  importing a conservative, production-grade subset; operators who want
+  the full feed can still broaden the thresholds in the UI. Existing
+  playbooks keep whatever thresholds they already saved — defaults only
+  bite on brand-new trigger instances.
+
 ## 1.1.2 - 2026-10-13
 
 ### Fixed

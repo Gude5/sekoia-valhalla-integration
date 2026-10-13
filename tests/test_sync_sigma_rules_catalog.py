@@ -11,6 +11,7 @@ from nextron_valhalla_sigma_rules_modules.triggers.sync_sigma_rules_catalog impo
     UUID_MAP_FILE,
     SyncSigmaRulesCatalog,
     _disable_body_from_server,
+    _rule_has_tag,
 )
 
 
@@ -46,6 +47,7 @@ def trigger(data_storage):
     t._sekoia.get_rule.return_value = {"enabled": False}
     t._enabled = False
     t._disable_removed = False
+    t._preserve_tag = "nextron-valhalla-keep-custom"
     # Permissive defaults matching the new-user experience: every rule
     # with status experimental+ and any Sigma level passes.
     t._min_severity = 10  # informational
@@ -96,6 +98,7 @@ def test_second_sync_puts_existing_rules(trigger):
     assert event == {
         "created": 0,
         "updated": 2,
+        "preserved": 0,
         "failed": 0,
         "skipped_unmapped": 0,
         "skipped_filter": 0,
@@ -523,6 +526,191 @@ def test_run_exits_after_stop_during_wait(monkeypatch, data_storage):
     th.join(timeout=5)
     assert not th.is_alive(), "run() should exit when stop() is called mid-wait"
     assert t._sync_once.call_count >= 1
+
+
+# ---------------------------------------------------------------------------
+# preserve_tag — per-rule opt-out from Valhalla overwrites
+# ---------------------------------------------------------------------------
+
+
+def test_rule_has_tag_structured_shape():
+    """``[{uuid, name}, …]`` is the shape Sekoia returns on GET."""
+    rule = {
+        "tags": [
+            {"uuid": "t1", "name": "attack.t1059"},
+            {"uuid": "t2", "name": "nextron-valhalla-keep-custom"},
+        ],
+    }
+    assert _rule_has_tag(rule, "nextron-valhalla-keep-custom") is True
+    assert _rule_has_tag(rule, "attack.t1059") is True
+    assert _rule_has_tag(rule, "missing") is False
+
+
+def test_rule_has_tag_plain_string_shape():
+    rule = {"tags": ["attack.t1059", "nextron-valhalla-keep-custom"]}
+    assert _rule_has_tag(rule, "nextron-valhalla-keep-custom") is True
+
+
+def test_rule_has_tag_empty_tag_name_returns_false():
+    """Empty / None ``tag_name`` is the opt-out for the preserve check —
+    treat ANY rule as 'no preserve tag' so the normal update happens."""
+    rule = {"tags": ["anything", "nextron-valhalla-keep-custom"]}
+    assert _rule_has_tag(rule, "") is False
+    assert _rule_has_tag(rule, None) is False
+
+
+def test_rule_has_tag_rule_without_tags_key():
+    assert _rule_has_tag({}, "x") is False
+    assert _rule_has_tag({"tags": None}, "x") is False
+
+
+def test_preserve_tag_skips_update_when_server_rule_carries_it(trigger):
+    """A rule tagged with the configured preserve tag in Sekoia is NOT
+    PUT with Valhalla content; the counter increments."""
+    trigger._sync_once()  # populate id_map; both rules then exist
+    trigger._sekoia.create_rule.reset_mock()
+    trigger._sekoia.update_rule.reset_mock()
+    trigger.send_event.reset_mock()
+
+    # On the next sync, A's GET returns the preserve tag (structured shape),
+    # B's doesn't.
+    def _get(uuid):
+        if uuid == "sekoia-A":
+            return {
+                "enabled": True,
+                "tags": [{"uuid": "t1", "name": "nextron-valhalla-keep-custom"}],
+            }
+        return {"enabled": True}
+    trigger._sekoia.get_rule.side_effect = _get
+
+    trigger._sync_once()
+
+    # A was preserved → no PUT for A; B was updated normally.
+    assert trigger._sekoia.update_rule.call_count == 1
+    assert trigger._sekoia.update_rule.call_args.args[0] == "sekoia-B"
+    event = trigger.send_event.call_args.kwargs["event"]
+    assert event["preserved"] == 1
+    assert event["updated"] == 1
+
+
+def test_preserve_tag_accepts_plain_string_tags(trigger):
+    trigger._sync_once()
+    trigger._sekoia.update_rule.reset_mock()
+    trigger.send_event.reset_mock()
+
+    def _get(uuid):
+        if uuid == "sekoia-A":
+            return {"enabled": True, "tags": ["nextron-valhalla-keep-custom"]}
+        return {"enabled": True}
+    trigger._sekoia.get_rule.side_effect = _get
+
+    trigger._sync_once()
+
+    assert trigger._sekoia.update_rule.call_count == 1
+    event = trigger.send_event.call_args.kwargs["event"]
+    assert event["preserved"] == 1
+
+
+def test_preserve_tag_absent_updates_normally(trigger):
+    """No preserve tag on either rule → both get the usual PUT; preserved=0."""
+    trigger._sync_once()
+    trigger._sekoia.update_rule.reset_mock()
+    trigger.send_event.reset_mock()
+
+    trigger._sekoia.get_rule.return_value = {
+        "enabled": True,
+        "tags": ["attack.t1059"],  # not the preserve tag
+    }
+    trigger._sync_once()
+
+    assert trigger._sekoia.update_rule.call_count == 2
+    event = trigger.send_event.call_args.kwargs["event"]
+    assert event["preserved"] == 0
+    assert event["updated"] == 2
+
+
+def test_preserve_tag_empty_disables_check(trigger):
+    """Empty ``preserve_tag`` config disables the per-rule check entirely —
+    even a rule carrying ``nextron-valhalla-keep-custom`` gets updated."""
+    trigger._preserve_tag = ""
+    trigger._sync_once()
+    trigger._sekoia.update_rule.reset_mock()
+    trigger.send_event.reset_mock()
+
+    trigger._sekoia.get_rule.return_value = {
+        "enabled": True,
+        "tags": ["nextron-valhalla-keep-custom"],
+    }
+    trigger._sync_once()
+
+    assert trigger._sekoia.update_rule.call_count == 2
+    event = trigger.send_event.call_args.kwargs["event"]
+    assert event["preserved"] == 0
+
+
+def test_preserve_tag_does_not_affect_posts(trigger, data_storage):
+    """A brand-new Valhalla rule whose Sigma ``tags`` include the preserve
+    tag (edge case) is still POSTed — the preserve check only guards the
+    update path."""
+    trigger._valhalla.get_sigma_feed.return_value = [
+        {
+            "id": "valhalla-new",
+            "filename": "new.yml",
+            "content": (
+                "title: New\n"
+                "detection:\n"
+                "  selection:\n    CommandLine|contains: 'x'\n"
+                "  condition: selection\n"
+                "level: medium\n"
+                "status: stable\n"
+                "tags:\n  - nextron-valhalla-keep-custom\n"
+            ),
+        }
+    ]
+
+    trigger._sync_once()
+
+    assert trigger._sekoia.create_rule.call_count == 1
+    assert trigger._sekoia.update_rule.call_count == 0
+    event = trigger.send_event.call_args.kwargs["event"]
+    assert event["created"] == 1
+    assert event["preserved"] == 0
+
+
+def test_disable_pass_still_fires_on_preserved_rule(trigger, data_storage):
+    """A preserved rule that then leaves the Valhalla feed must still be
+    disabled by ``disable_removed=true`` — the preserve tag protects
+    content, not lifecycle."""
+    trigger._sync_once()  # populate id_map
+    trigger._sekoia.create_rule.reset_mock()
+    trigger._sekoia.update_rule.reset_mock()
+    trigger.send_event.reset_mock()
+
+    # A drops from the feed AND is tagged with preserve.
+    trigger._valhalla.get_sigma_feed.return_value = [SAMPLE_RULES[1]]
+    trigger._disable_removed = True
+
+    def _get(uuid):
+        if uuid == "sekoia-A":
+            return {
+                "enabled": True,
+                "name": "A",
+                "tags": [{"uuid": "t1", "name": "nextron-valhalla-keep-custom"}],
+            }
+        return {"enabled": True}
+    trigger._sekoia.get_rule.side_effect = _get
+
+    trigger._sync_once()
+
+    # A is retired (enabled=false PUT) despite the preserve tag.
+    # B is updated normally.
+    event = trigger.send_event.call_args.kwargs["event"]
+    assert event["newly_disabled"] == 1
+    disable_puts = [
+        c for c in trigger._sekoia.update_rule.call_args_list
+        if c.args[1].get("enabled") is False
+    ]
+    assert len(disable_puts) == 1
 
 
 # ---------------------------------------------------------------------------

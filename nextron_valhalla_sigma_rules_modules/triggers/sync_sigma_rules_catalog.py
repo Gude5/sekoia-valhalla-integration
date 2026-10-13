@@ -19,8 +19,27 @@ from nextron_valhalla_sigma_rules_modules.sigma_mapper import (
 
 UUID_MAP_FILE = "valhalla-sigma-catalog-uuid-map.json"
 TOP_UNMAPPED_REPORT = 5
-DEFAULT_MIN_LEVEL = "informational"
-DEFAULT_MIN_STATUS = "experimental"
+DEFAULT_MIN_LEVEL = "medium"
+DEFAULT_MIN_STATUS = "stable"
+DEFAULT_PRESERVE_TAG = "nextron-valhalla-keep-custom"
+
+
+def _rule_has_tag(rule: dict, tag_name: str) -> bool:
+    """True when the server rule's ``tags`` list contains a tag with this
+    exact name. Accepts both the structured ``[{uuid, name}, …]`` shape
+    Sekoia returns on GET and the plain-string shape used elsewhere.
+
+    Empty / falsy ``tag_name`` returns ``False`` — the caller uses that
+    to disable the per-rule preserve check entirely.
+    """
+    if not tag_name:
+        return False
+    for tag in rule.get("tags") or []:
+        if isinstance(tag, dict) and tag.get("name") == tag_name:
+            return True
+        if isinstance(tag, str) and tag == tag_name:
+            return True
+    return False
 
 # Fields the Sekoia Rules Catalog PUT endpoint accepts. Sekoia's GET
 # response additionally carries read-only metadata (`uuid`, `created_at`,
@@ -79,6 +98,9 @@ class SyncSigmaRulesCatalog(Trigger):
         self._sekoia = SekoiaClient(cfg.sekoia_base_url, cfg.sekoia_api_key)
         self._enabled = self.configuration.get("enabled", False)
         self._disable_removed = bool(self.configuration.get("disable_removed", False))
+        self._preserve_tag = self.configuration.get(
+            "preserve_tag", DEFAULT_PRESERVE_TAG
+        )
         min_level = self.configuration.get("min_sigma_level", DEFAULT_MIN_LEVEL)
         min_status = self.configuration.get("min_sigma_status", DEFAULT_MIN_STATUS)
         if min_level not in SEVERITY_MAP:
@@ -133,6 +155,7 @@ class SyncSigmaRulesCatalog(Trigger):
         rules = self._valhalla.get_sigma_feed()
         created = 0
         updated = 0
+        preserved = 0
         failed = 0
         skipped_unmapped = 0
         filtered_out = 0
@@ -183,6 +206,13 @@ class SyncSigmaRulesCatalog(Trigger):
                             # the user disabled in the catalog stays
                             # disabled across syncs.
                             current = self._sekoia.get_rule(sekoia_uuid)
+                            if _rule_has_tag(current, self._preserve_tag):
+                                # Operator tagged this rule in the Sekoia UI
+                                # to protect their hand-edits. Skip the
+                                # overwrite entirely — the ``disable_removed``
+                                # pass still runs independently if enabled.
+                                preserved += 1
+                                continue
                             body["enabled"] = bool(
                                 current.get("enabled", self._enabled)
                             )
@@ -223,7 +253,8 @@ class SyncSigmaRulesCatalog(Trigger):
         top_unmapped = dict(unmapped_field_counter.most_common(TOP_UNMAPPED_REPORT))
         self.log(
             f"Catalog sync: created={created} updated={updated} "
-            f"failed={failed} skipped_unmapped={skipped_unmapped} "
+            f"preserved={preserved} failed={failed} "
+            f"skipped_unmapped={skipped_unmapped} "
             f"filtered_out={filtered_out} total_rules={len(rules)} "
             f"disable_counts={disable_counts} "
             f"top_unmapped={top_unmapped}",
@@ -234,6 +265,7 @@ class SyncSigmaRulesCatalog(Trigger):
             event={
                 "created": created,
                 "updated": updated,
+                "preserved": preserved,
                 "failed": failed,
                 "skipped_unmapped": skipped_unmapped,
                 "skipped_filter": filtered_out,

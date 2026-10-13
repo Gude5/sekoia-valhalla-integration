@@ -46,6 +46,7 @@ The Valhalla API URL is hardcoded to `https://valhalla.nextron-systems.com`.
 - **Rules with multiple `Hashes` keys in one selection block.** The sync trigger rewrites the first `Hashes` / `Hashes|<mod>` key it finds inside a selection and preserves other keys verbatim. Valhalla's current feed never emits this shape; a rule that does will land under `skipped_unmapped`.
 - **Multi-algo `Hashes` lists (`[MD5=…, SHA256=…]`) become AND-across-algo keys rather than OR-over-files.** This matches the semantic for IOC rules that enumerate a fingerprint per file (one hash per algo per event), which is how Valhalla ships them. See the `_apply_hashes_transform` docstring for the exact approximation.
 - **Rules dropped from the Valhalla feed are not disabled automatically.** Set the sync trigger's `disable_removed=true` to disable them (dry-run by default). The dedicated `delete-catalog-rules` trigger removes them outright when you're ready.
+- **Hand edits in Sekoia are overwritten by the next sync by default.** To protect a rule you've tuned, add the tag `nextron-valhalla-keep-custom` to it in the Sekoia UI. Subsequent syncs will skip the PUT for that rule and count it under `preserved` on the summary event. The tag name is configurable via the sync trigger's `preserve_tag` argument (leave empty to disable the check entirely). `disable_removed` still fires on preserved rules — content stays intact, only `enabled` can flip.
 
 ## Repository layout
 

@@ -24,7 +24,7 @@
         "description": "Only rules with a Sigma `level` at least this severe are imported. Rules missing the `level` field are always skipped.",
         "enum": ["informational", "low", "medium", "high", "critical"],
         "enumNames": ["informational", "low", "medium", "high", "critical"],
-        "default": "informational"
+        "default": "medium"
       },
       "min_sigma_status": {
         "type": "string",
@@ -32,13 +32,19 @@
         "description": "Only rules with a Sigma `status` at least this mature are imported (ordering: experimental < test < stable). Rules with status `deprecated` or `unsupported` are never imported. Rules missing the `status` field are always skipped.",
         "enum": ["experimental", "test", "stable"],
         "enumNames": ["experimental", "test", "stable"],
-        "default": "experimental"
+        "default": "stable"
       },
       "disable_removed": {
         "type": "boolean",
         "title": "Disable rules removed from the Valhalla feed",
         "description": "When Nextron removes a rule from the Valhalla feed (deprecated, superseded, withdrawn) — or when a rule newly drops below your configured minimum level/status — the sync disables it in the Sekoia catalog by setting enabled=false. The rule is NOT deleted: it stays in the catalog so you can inspect it, and if Nextron re-publishes it later the sync resumes updating in place. Default false — dry-run that only counts how many rules WOULD be disabled (see the `to_disable` field on the summary event). Set to true to actually disable.",
         "default": false
+      },
+      "preserve_tag": {
+        "type": "string",
+        "title": "Preserve tag (per-rule opt-out)",
+        "description": "A rule in the Sekoia catalog that carries a tag with this exact name is NOT overwritten with Valhalla's content on subsequent syncs. Use it to protect hand-tuned rules: edit the rule in the Sekoia UI, add this tag, and future syncs will skip the PUT for that rule (counted under `preserved` on the summary event). Leave empty to disable the per-rule check (every existing rule is updated from Valhalla as usual). The `disable_removed` pass still runs on preserved rules — it only flips `enabled` and keeps hand-edited content intact.",
+        "default": "nextron-valhalla-keep-custom"
       }
     },
     "required": []
@@ -48,6 +54,7 @@
     "properties": {
       "created": { "type": "integer" },
       "updated": { "type": "integer" },
+      "preserved": { "type": "integer" },
       "failed": { "type": "integer" },
       "skipped_unmapped": { "type": "integer" },
       "skipped_filter": { "type": "integer" },
