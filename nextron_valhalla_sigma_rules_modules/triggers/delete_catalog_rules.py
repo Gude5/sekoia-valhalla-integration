@@ -2,7 +2,6 @@ import json
 from collections import Counter
 from typing import Iterable
 
-from apscheduler.schedulers.blocking import BlockingScheduler
 from sekoia_automation.trigger import Trigger
 
 from nextron_valhalla_sigma_rules_modules.sekoia_client import SekoiaClient
@@ -62,11 +61,18 @@ class DeleteCatalogRules(Trigger):
         self._match_value = self.configuration.get("match_value", "")
         frequency = self.configuration.get("frequency", 86400)
 
-        self._delete_once()
-
-        scheduler = BlockingScheduler()
-        scheduler.add_job(self._delete_once, "interval", seconds=frequency)
-        scheduler.start()
+        # SDK pattern: observe the stop-event between iterations so
+        # SIGINT/SIGTERM from Sekoia's playbook runner unblocks us
+        # instead of hanging on the next sleep interval.
+        while self.running:
+            try:
+                self._delete_once()
+            except Exception as exc:
+                self.log_exception(
+                    exc,
+                    message="Failed to delete Valhalla-imported Rules Catalog rules",
+                )
+            self._stop_event.wait(frequency)
 
     def _delete_once(self):
         try:

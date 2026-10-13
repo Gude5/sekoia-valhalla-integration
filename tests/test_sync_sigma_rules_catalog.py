@@ -39,7 +39,12 @@ def trigger(data_storage):
     t._valhalla.get_sigma_feed.return_value = list(SAMPLE_RULES)
     t._sekoia = MagicMock()
     t._sekoia.create_rule.side_effect = lambda body: f"sekoia-{body['name']}"
+    # Default server state for the PUT pre-flight GET: rule is enabled=False
+    # (matches _enabled=False default so update-path tests see the same
+    # body["enabled"] value the pre-get-rule code used to send).
+    t._sekoia.get_rule.return_value = {"enabled": False}
     t._enabled = False
+    t._disable_removed = False
     # Permissive defaults matching the new-user experience: every rule
     # with status experimental+ and any Sigma level passes.
     t._min_severity = 10  # informational
@@ -95,6 +100,11 @@ def test_second_sync_puts_existing_rules(trigger):
         "skipped_filter": 0,
         "total_rules": 2,
         "top_unmapped": {},
+        "to_disable": 0,
+        "newly_disabled": 0,
+        "already_disabled": 0,
+        "already_gone": 0,
+        "disable_failed": 0,
     }
 
 
@@ -379,3 +389,282 @@ def test_stale_put_then_failed_post_counts_as_failed(trigger):
     assert event["created"] == 0
     assert event["updated"] == 0
     assert event["failed"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Preserve user's ``enabled`` choice on update (blocker #1 — GET-then-PUT)
+# ---------------------------------------------------------------------------
+
+
+def test_update_preserves_user_disabled(trigger):
+    """A rule the user disabled in the catalog must stay disabled on
+    the next sync even if the trigger config has enabled=True."""
+    trigger._enabled = True
+    trigger._sync_once()  # populate id_map with POSTs
+    trigger._sekoia.create_rule.reset_mock()
+    trigger._sekoia.update_rule.reset_mock()
+    trigger._sekoia.get_rule.return_value = {"enabled": False}
+
+    trigger._sync_once()
+
+    assert trigger._sekoia.update_rule.call_count == 2
+    for call in trigger._sekoia.update_rule.call_args_list:
+        body = call.args[1]
+        assert body["enabled"] is False
+
+
+def test_update_preserves_user_enabled(trigger):
+    """A rule the user enabled must stay enabled even if the trigger's
+    default is enabled=False."""
+    trigger._enabled = False
+    trigger._sync_once()
+    trigger._sekoia.create_rule.reset_mock()
+    trigger._sekoia.update_rule.reset_mock()
+    trigger._sekoia.get_rule.return_value = {"enabled": True}
+
+    trigger._sync_once()
+
+    assert trigger._sekoia.update_rule.call_count == 2
+    for call in trigger._sekoia.update_rule.call_args_list:
+        body = call.args[1]
+        assert body["enabled"] is True
+
+
+def test_get_rule_404_falls_back_to_repost(trigger, data_storage):
+    """A GET that returns 404 (rule deleted server-side) must drop the
+    id-map entry and POST the rule as new — same fallback path as a 404
+    on PUT. Fresh POST uses the trigger's own ``enabled`` default, not
+    whatever the stale server state said."""
+    trigger._sync_once()  # populate id_map
+    trigger._sekoia.create_rule.reset_mock()
+    trigger._sekoia.update_rule.reset_mock()
+    trigger._sekoia.get_rule.side_effect = SekoiaRuleNotFoundError(
+        "gone", status_code=404
+    )
+    trigger._sekoia.create_rule.side_effect = lambda body: f"sekoia-new-{body['name']}"
+
+    trigger._sync_once()
+
+    assert trigger._sekoia.update_rule.call_count == 0
+    assert trigger._sekoia.create_rule.call_count == 2
+    id_map = json.loads((Path(data_storage) / UUID_MAP_FILE).read_text())
+    assert id_map == {
+        "valhalla-a": "sekoia-new-A",
+        "valhalla-b": "sekoia-new-B",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Argument validation (should-fix #6)
+# ---------------------------------------------------------------------------
+
+
+def test_invalid_min_level_raises(trigger):
+    trigger.configuration = {"min_sigma_level": "bogus"}
+    trigger.module = MagicMock()
+    with pytest.raises(ValueError, match="min_sigma_level"):
+        trigger.run()
+
+
+def test_invalid_min_status_raises(trigger):
+    trigger.configuration = {"min_sigma_status": "bogus"}
+    trigger.module = MagicMock()
+    with pytest.raises(ValueError, match="min_sigma_status"):
+        trigger.run()
+
+
+# ---------------------------------------------------------------------------
+# Stop-event shutdown (should-fix #2)
+# ---------------------------------------------------------------------------
+
+
+def test_run_exits_when_stop_event_is_set(monkeypatch, data_storage):
+    """Pre-set the stop event; run() must return without iterating."""
+    import threading
+    from nextron_valhalla_sigma_rules_modules.triggers import (
+        sync_sigma_rules_catalog as sync_mod,
+    )
+    monkeypatch.setattr(sync_mod, "ValhallaClient", MagicMock())
+    monkeypatch.setattr(sync_mod, "SekoiaClient", MagicMock())
+
+    t = SyncSigmaRulesCatalog(data_path=Path(data_storage))
+    t.module = MagicMock()
+    t.configuration = {"frequency": 60}
+    t._sync_once = MagicMock()
+    t._stop_event.set()  # loop guard sees running=False, exits immediately
+
+    th = threading.Thread(target=t.run)
+    th.start()
+    th.join(timeout=5)
+    assert not th.is_alive(), "run() should exit when stop event is set"
+
+
+def test_run_exits_after_stop_during_wait(monkeypatch, data_storage):
+    """Trigger runs, we call stop() while it's waiting on the next
+    iteration — _stop_event.wait() returns early and the loop exits."""
+    import threading
+    import time
+    from nextron_valhalla_sigma_rules_modules.triggers import (
+        sync_sigma_rules_catalog as sync_mod,
+    )
+    monkeypatch.setattr(sync_mod, "ValhallaClient", MagicMock())
+    monkeypatch.setattr(sync_mod, "SekoiaClient", MagicMock())
+
+    t = SyncSigmaRulesCatalog(data_path=Path(data_storage))
+    t.module = MagicMock()
+    t.configuration = {"frequency": 3600}  # long sleep so we're definitely waiting
+    t._sync_once = MagicMock()
+
+    th = threading.Thread(target=t.run)
+    th.start()
+    time.sleep(0.2)  # let it get into _stop_event.wait()
+    t.stop()
+    th.join(timeout=5)
+    assert not th.is_alive(), "run() should exit when stop() is called mid-wait"
+    assert t._sync_once.call_count >= 1
+
+
+# ---------------------------------------------------------------------------
+# disable_removed (should-fix #4)
+# ---------------------------------------------------------------------------
+
+
+def test_disable_removed_dry_run_counts_but_doesnt_put(trigger, data_storage):
+    """With disable_removed=False (default) a rule dropped from the feed
+    appears in ``to_disable`` but is NOT PUT with enabled=false."""
+    trigger._sync_once()  # populate id_map with both A and B
+    trigger._sekoia.create_rule.reset_mock()
+    trigger._sekoia.update_rule.reset_mock()
+    trigger.send_event.reset_mock()
+
+    # A drops from the feed; B stays.
+    trigger._valhalla.get_sigma_feed.return_value = [SAMPLE_RULES[1]]
+    trigger._sekoia.get_rule.return_value = {"enabled": False}
+
+    trigger._sync_once()
+
+    event = trigger.send_event.call_args.kwargs["event"]
+    assert event["to_disable"] == 1
+    assert event["newly_disabled"] == 0
+    # No extra PUTs for the disable pass — just the update PUT for B.
+    assert trigger._sekoia.update_rule.call_count == 1
+    # id_map keeps A (reappearing rule resumes update in place).
+    id_map = json.loads((Path(data_storage) / UUID_MAP_FILE).read_text())
+    assert "valhalla-a" in id_map
+
+
+def test_disable_removed_puts_rule_with_enabled_false(trigger, data_storage):
+    """With disable_removed=True, a dropped rule gets GET-then-PUT with
+    enabled=false. Other server fields on the body are preserved."""
+    trigger._sync_once()  # populate id_map
+    trigger._sekoia.create_rule.reset_mock()
+    trigger._sekoia.update_rule.reset_mock()
+    trigger.send_event.reset_mock()
+
+    trigger._disable_removed = True
+    trigger._valhalla.get_sigma_feed.return_value = [SAMPLE_RULES[1]]
+    trigger._sekoia.get_rule.return_value = {
+        "enabled": True,
+        "name": "A",
+        "severity": 42,  # must round-trip
+    }
+
+    trigger._sync_once()
+
+    event = trigger.send_event.call_args.kwargs["event"]
+    assert event["to_disable"] == 1
+    assert event["newly_disabled"] == 1
+
+    disable_puts = [
+        c for c in trigger._sekoia.update_rule.call_args_list
+        if c.args[1].get("severity") == 42
+    ]
+    assert len(disable_puts) == 1
+    assert disable_puts[0].args[1]["enabled"] is False
+    # Server body round-tripped — no clobber of severity.
+    assert disable_puts[0].args[1]["severity"] == 42
+
+    # id_map entry kept so reappearing rule resumes update.
+    id_map = json.loads((Path(data_storage) / UUID_MAP_FILE).read_text())
+    assert "valhalla-a" in id_map
+
+
+def test_already_disabled_is_counted(trigger):
+    """Rules already disabled server-side are counted under
+    ``already_disabled`` and no PUT is sent for them."""
+    trigger._sync_once()
+    trigger._sekoia.update_rule.reset_mock()
+    trigger.send_event.reset_mock()
+    trigger._disable_removed = True
+
+    # A drops from the feed; GET on A returns already-disabled.
+    trigger._valhalla.get_sigma_feed.return_value = [SAMPLE_RULES[1]]
+
+    def _get(uuid):
+        return {"enabled": uuid != "sekoia-A"}  # sekoia-A is disabled
+    trigger._sekoia.get_rule.side_effect = _get
+
+    trigger._sync_once()
+
+    event = trigger.send_event.call_args.kwargs["event"]
+    assert event["to_disable"] == 1
+    assert event["already_disabled"] == 1
+    assert event["newly_disabled"] == 0
+    disable_puts = [
+        c for c in trigger._sekoia.update_rule.call_args_list
+        if c.args[0] == "sekoia-A"
+    ]
+    assert len(disable_puts) == 0
+
+
+def test_already_gone_drops_idmap(trigger, data_storage):
+    """A disable candidate whose GET returns ``SekoiaRuleNotFoundError``
+    is counted under ``already_gone`` and the id-map entry is dropped
+    (nothing left to disable)."""
+    trigger._sync_once()
+    trigger.send_event.reset_mock()
+    trigger._disable_removed = True
+
+    trigger._valhalla.get_sigma_feed.return_value = [SAMPLE_RULES[1]]
+
+    def _get(uuid):
+        if uuid == "sekoia-A":
+            raise SekoiaRuleNotFoundError("gone", status_code=404)
+        return {"enabled": True}
+    trigger._sekoia.get_rule.side_effect = _get
+
+    trigger._sync_once()
+
+    event = trigger.send_event.call_args.kwargs["event"]
+    assert event["already_gone"] == 1
+
+    id_map = json.loads((Path(data_storage) / UUID_MAP_FILE).read_text())
+    assert "valhalla-a" not in id_map
+
+
+def test_reappearing_rule_resumes_update_in_place(trigger, data_storage):
+    """A rule disabled on sync N and then reappearing on sync N+1 goes
+    down the UPDATE path (GET-then-PUT) with its old sekoia_uuid, not a
+    fresh POST — because the id-map entry was kept."""
+    trigger._sync_once()  # populate; id_map["valhalla-a"] = "sekoia-A"
+    original_a_uuid = json.loads(
+        (Path(data_storage) / UUID_MAP_FILE).read_text()
+    )["valhalla-a"]
+    trigger._sekoia.create_rule.reset_mock()
+    trigger._sekoia.update_rule.reset_mock()
+    trigger._disable_removed = True
+    trigger._sekoia.get_rule.return_value = {"enabled": True}
+
+    # Sync 2: A missing, B present. A gets disabled.
+    trigger._valhalla.get_sigma_feed.return_value = [SAMPLE_RULES[1]]
+    trigger._sync_once()
+    trigger._sekoia.update_rule.reset_mock()
+    trigger._sekoia.create_rule.reset_mock()
+
+    # Sync 3: A returns. Expect UPDATE with the same sekoia_uuid.
+    trigger._valhalla.get_sigma_feed.return_value = list(SAMPLE_RULES)
+    trigger._sync_once()
+
+    assert trigger._sekoia.create_rule.call_count == 0
+    update_uuids = [c.args[0] for c in trigger._sekoia.update_rule.call_args_list]
+    assert original_a_uuid in update_uuids

@@ -41,6 +41,12 @@ To roll back, enable the **Delete all Valhalla-imported rules from the Sekoia Ru
 
 The Valhalla API URL is hardcoded to `https://valhalla.nextron-systems.com`.
 
+## Known limitations
+
+- **Rules with multiple `Hashes` keys in one selection block.** The sync trigger rewrites the first `Hashes` / `Hashes|<mod>` key it finds inside a selection and preserves other keys verbatim. Valhalla's current feed never emits this shape; a rule that does will land under `skipped_unmapped`.
+- **Multi-algo `Hashes` lists (`[MD5=…, SHA256=…]`) become AND-across-algo keys rather than OR-over-files.** This matches the semantic for IOC rules that enumerate a fingerprint per file (one hash per algo per event), which is how Valhalla ships them. See the `_apply_hashes_transform` docstring for the exact approximation.
+- **Rules dropped from the Valhalla feed are not disabled automatically.** Set the sync trigger's `disable_removed=true` to disable them (dry-run by default). The dedicated `delete-catalog-rules` trigger removes them outright when you're ready.
+
 ## Repository layout
 
 ```
@@ -70,21 +76,6 @@ uv run pytest          # run the test suite
 
 The `Dockerfile` builds the runtime image Sekoia executes. Bump `version` in `manifest.json` on every push-worthy change — Sekoia's importer rejects same-version reimports.
 
-### Dependency management (uv *and* poetry)
+### Dependency management
 
-The module ships **two lockfiles**, because its two consumers want different things:
-
-| Lockfile | Used by |
-|---|---|
-| `uv.lock` | the `Dockerfile` (`uv sync --frozen`) and local development |
-| `poetry.lock` | Sekoia's module importer, which rejects a module that ships no `poetry.lock` |
-
-Runtime dependencies are declared once, in PEP 621 `[project].dependencies` — both tools read it. Dev dependencies must be declared **twice** (`[dependency-groups].dev` for uv, `[tool.poetry.group.dev.dependencies]` for poetry, which doesn't yet read PEP 735 groups).
-
-After changing any dependency, regenerate both:
-
-```
-uv lock && poetry lock
-```
-
-Two resolvers over one dependency set drift silently — the first generation of this pair already disagreed on a transitive package. `tests/test_lockfiles.py` fails if the lockfiles disagree on a runtime version or if the two dev lists diverge, so `uv run pytest` catches it.
+`uv.lock` is the single source of truth for installed versions. The `Dockerfile` installs from it via `uv sync --frozen`, and local development uses the same lockfile. After changing a dependency in `pyproject.toml`, regenerate with `uv lock`. `tests/test_lockfile.py` fails if a declared runtime dep is missing from the lock.

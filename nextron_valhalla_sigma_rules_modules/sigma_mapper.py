@@ -200,6 +200,10 @@ def _apply_hashes_transform(selection_dict: dict) -> Optional[dict]:
     for k in selection_dict.keys():
         if isinstance(k, str) and (k == "Hashes" or k.startswith("Hashes|")):
             hashes_key = k
+            # Known limitation: only the first ``Hashes*`` key is rewritten.
+            # Valhalla's current feed never emits multiple distinct
+            # ``Hashes|<mod>`` keys in the same selection; see README
+            # "Known limitations".
             break
     if hashes_key is None:
         return selection_dict
@@ -318,8 +322,9 @@ def convert_parsed_to_ecs(
     if unmapped:
         return None, sorted(set(unmapped))
 
-    parsed["detection"] = new_detection
-    return parsed, []
+    result = dict(parsed)
+    result["detection"] = new_detection
+    return result, []
 
 
 def convert_payload_to_ecs(
@@ -367,6 +372,12 @@ def sigma_rule_to_catalog_payload(
     Optional Sekoia fields (``tags``, ``false_positives``) are included
     only when the source Sigma rule actually carries the corresponding
     data.
+
+    The ``enabled`` argument is authoritative only on the POST path (rule
+    creation). Callers routing the body through PUT (rule update) MUST
+    overwrite ``body["enabled"]`` with the server's current value first,
+    otherwise a user who flipped a rule off in the catalog will be
+    silently re-enabled on the next sync.
     """
     title = parsed.get("title") or rule.get("name") or rule.get("filename") or "unnamed"
     if len(title) > MAX_NAME_LENGTH:

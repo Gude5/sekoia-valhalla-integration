@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.1.0 - 2026-10-13
+
+### Added
+- `SekoiaClient.get_rule(uuid)` helper.
+- `disable_removed` sync-trigger argument (default `false`, dry-run) that
+  disables rules dropped from the Valhalla feed or newly below the
+  configured severity/status thresholds. Server-side body is preserved
+  on disable — only `enabled` flips to false. Dry-run emits `to_disable`;
+  live mode also emits `newly_disabled`, `already_disabled`,
+  `already_gone`, `disable_failed`.
+- `ruff` and `mypy` to the dev dependency group.
+- "Known limitations" section in README covering the `Hashes` transform's
+  one-key rewrite, the multi-algo AND/OR approximation, and the
+  `disable_removed` opt-in for stale rules.
+
+### Changed
+- Sync and `delete-catalog-rules` triggers now observe the SDK stop
+  event. Replaced `BlockingScheduler.start()` with a `while
+  self.running: self._stop_event.wait(frequency)` loop and dropped the
+  `APScheduler` runtime dependency.
+- PUT in `update_rule` is preceded by a GET; the server's current
+  `enabled` is re-sent so a rule a user disabled in the catalog stays
+  disabled across syncs. `self._enabled` is only authoritative on POST
+  (initial creation) and the create-after-fallback path.
+- Only HTTP 404 (and HTTP 403 with Sekoia error code `AU202`) is treated
+  as "rule missing server-side". Other 403 responses now surface as
+  `SekoiaAPIError` so a permission/scope problem no longer looks like a
+  deleted rule.
+- `allowed_methods` on the retry adapter no longer includes POST: a
+  read-timeout on rule creation cannot duplicate a rule.
+- Invalid `min_sigma_level` or `min_sigma_status` config now raises a
+  descriptive `ValueError` instead of a bare `KeyError`.
+- `trigger_sync_sigma_rules_catalog.json` `results.properties` now
+  declares every field the trigger emits, including the new
+  disable-pass counters.
+- Build/dev tooling migrated from poetry + black + isort to uv + ruff +
+  mypy. `poetry.lock` and `tests/test_lockfiles.py` removed in favour of
+  `tests/test_lockfile.py` guarding the uv-only setup. Coverage gate
+  raised from 5% to 85%.
+
+### Upgrading from 1.0.x
+Rules already in the catalog that were overwritten with `enabled=false`
+on a prior sync will stay disabled until a user flips them back on in
+the UI. 1.1.0 won't retroactively re-enable them — it just stops
+clobbering the flag going forward.
+
 ## 1.0.2 - 2026-09-14
 
 ### Changed

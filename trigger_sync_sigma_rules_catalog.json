@@ -1,7 +1,7 @@
 {
   "uuid": "349e50ff-f44f-420d-a09e-7567997ddd62",
   "name": "Sync Valhalla Sigma rules into Sekoia Rules Catalog",
-  "description": "Periodically pulls the Valhalla Sigma feed and POSTs each rule to the Sekoia Rules Catalog so it executes in the detection engine. POST on first seen, PUT on subsequent pulls.",
+  "description": "Periodically pulls the Valhalla Sigma feed and POSTs each rule to the Sekoia Rules Catalog so it executes in the detection engine. POST on first seen, PUT on subsequent pulls. The server's current `enabled` flag is re-sent on PUT so a rule the user disabled in the catalog stays disabled across syncs.",
   "docker_parameters": "sync-sigma-rules-catalog",
   "arguments": {
     "type": "object",
@@ -15,7 +15,7 @@
       "enabled": {
         "type": "boolean",
         "title": "Enable rules on push",
-        "description": "When false (default), rules land in the catalog disabled — users opt in per rule.",
+        "description": "When false (default), newly-created rules land in the catalog disabled — users opt in per rule. Only applied on initial POST; existing rules preserve whatever the user chose in the catalog.",
         "default": false
       },
       "min_sigma_level": {
@@ -33,6 +33,12 @@
         "enum": ["experimental", "test", "stable"],
         "enumNames": ["experimental", "test", "stable"],
         "default": "experimental"
+      },
+      "disable_removed": {
+        "type": "boolean",
+        "title": "Disable rules removed from the Valhalla feed",
+        "description": "When Nextron removes a rule from the Valhalla feed (deprecated, superseded, withdrawn) — or when a rule newly drops below your configured minimum level/status — the sync disables it in the Sekoia catalog by setting enabled=false. The rule is NOT deleted: it stays in the catalog so you can inspect it, and if Nextron re-publishes it later the sync resumes updating in place. Default false — dry-run that only counts how many rules WOULD be disabled (see the `to_disable` field on the summary event). Set to true to actually disable.",
+        "default": false
       }
     },
     "required": []
@@ -41,7 +47,17 @@
     "type": "object",
     "properties": {
       "created": { "type": "integer" },
-      "updated": { "type": "integer" }
+      "updated": { "type": "integer" },
+      "failed": { "type": "integer" },
+      "skipped_unmapped": { "type": "integer" },
+      "skipped_filter": { "type": "integer" },
+      "total_rules": { "type": "integer" },
+      "top_unmapped": { "type": "object" },
+      "to_disable": { "type": "integer" },
+      "newly_disabled": { "type": "integer" },
+      "already_disabled": { "type": "integer" },
+      "already_gone": { "type": "integer" },
+      "disable_failed": { "type": "integer" }
     }
   }
 }
