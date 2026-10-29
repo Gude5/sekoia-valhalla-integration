@@ -108,7 +108,7 @@ docs/                                          # mapping references and internal
 ## Development
 
 ```
-uv sync                                        # install deps (Python 3.14)
+uv sync                                        # install deps (Python 3.12+)
 uv run ruff check . && uv run ruff format --check . && uv run mypy .
 uv run pytest
 ```

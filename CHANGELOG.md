@@ -39,8 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or `process.executable` (driver load); `Hashes` targets depend on the
   category and mixed algorithms become an OR (list of maps); `Initiated` is
   no longer mapped; `attack.*` tags with underscores select the alert type.
-- Python 3.14, `sekoia-automation-sdk>=1.27.0`, sibling ruff/mypy config,
-  `mise.toml`, Dockerfile with the `/tmp` → `/dev/shm` symlink.
+- `sekoia-automation-sdk>=1.27.0`, sibling ruff/mypy config, `mise.toml`,
+  Dockerfile with the `/tmp` → `/dev/shm` symlink. Python stays `>=3.12`:
+  Sekoia's custom-integration import builds the image with Python 3.12 and
+  Poetry, independent of the module's Dockerfile.
 - `sekoia_base_url` must use `https://`.
 - The rule payload now includes the Sigma `logsource` block.
 - `effort` is a fixed value (`2`) instead of being derived from the Sigma

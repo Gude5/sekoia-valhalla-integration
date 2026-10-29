@@ -4,7 +4,7 @@
 # declared here, since both are module-specific.
 
 [tools]
-python = "3.14"
+python = "3.12"
 
 [env]
 _.python.venv = { path = ".venv", create = false }

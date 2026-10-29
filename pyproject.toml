@@ -3,7 +3,7 @@ name = "nextron-valhalla-sigma-rules"
 version = "1.4.0"
 description = "Syncs the Nextron Valhalla Sigma feed into the Sekoia Rules Catalog"
 authors = []
-requires-python = ">=3.14,<4"
+requires-python = ">=3.12,<4"
 
 dependencies = [
     "sekoia-automation-sdk>=1.27.0,<2",
@@ -30,7 +30,7 @@ default-groups = ["dev", "lint"]
 
 [tool.ruff]
 line-length = 119
-target-version = "py314"
+target-version = "py312"
 fix = true
 
 [tool.ruff.lint]
@@ -40,7 +40,7 @@ select = ["A", "ARG", "E", "F", "I", "N", "RUF", "UP", "W"]
 "tests/*" = ["ARG"]
 
 [tool.mypy]
-python_version = "3.14"
+python_version = "3.12"
 install_types = true
 non_interactive = true
 ignore_missing_imports = true
