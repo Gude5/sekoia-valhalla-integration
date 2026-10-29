@@ -5,7 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 1.3.0 - 2026-10-13
+## 2026-10-29 - 1.4.0
+
+### Added
+- Optional `community_uuid` module setting: scopes the catalog scan and is
+  sent on every create/update. Without it the sync aborts if imported rules
+  exist in more than one community.
+- `disable_skipped_reason` on the summary event.
+- `related_object_refs` from ATT&CK technique tags (`attack.tXXXX`), resolved
+  once per technique via the intelligence API.
+- Sigma `references` are appended to the rule description.
+- Sigma `status` as a tag: `status-<status>`.
+- Startup check that the hard-coded alert-type UUIDs exist on the tenant.
+
+### Changed
+- The catalog scan lists rules with the server-side `match[tag_name]` filter
+  and provides the server state for the whole sync: the per-rule GET is gone.
+  A failing scan aborts the run instead of continuing on a partial map.
+- A mapped rule missing from the scan is re-created; a 403 is always a
+  failure, never "rule deleted" (AU202 handling removed).
+- Duplicate `uuid-*` markers resolve to the rule already in the local map.
+- Disable pass uses `PUT /rules/{uuid}/disabled`; `to_disable` only counts
+  rules that are still enabled. It is skipped when the feed is empty, shrank
+  by more than 20% (until that persists for 3 syncs), or the run was stopped.
+  Rules whose YAML failed to parse are never disabled.
+- The per-rule and disable loops check the stop event.
+- `preserve_rule_names` entries also match rule tags (e.g. `uuid-<valhalla_id>`).
+- Converter: field maps chosen by `logsource.product`; Windows `event_data`
+  catch-alls only apply to Windows rules; colliding target fields and
+  unmappable `|fieldref` values mark a rule unmapped; `TargetImage` /
+  `TargetProcessId` / `TargetProcessGUID`, signature and PE-metadata fields
+  map to `action.properties.*`; `ImageLoaded` maps to `dll.path` (image load)
+  or `process.executable` (driver load); `Hashes` targets depend on the
+  category and mixed algorithms become an OR (list of maps); `Initiated` is
+  no longer mapped; `attack.*` tags with underscores select the alert type.
+- Python 3.14, `sekoia-automation-sdk>=1.27.0`, sibling ruff/mypy config,
+  `mise.toml`, Dockerfile with the `/tmp` → `/dev/shm` symlink.
+- `sekoia_base_url` must use `https://`.
+- The rule payload now includes the Sigma `logsource` block.
+- `effort` is a fixed value (`2`) instead of being derived from the Sigma
+  status: it describes the expected analysis effort, not rule maturity.
+
+### Removed
+- `tests/test_lockfile.py`.
+
+## 2026-10-13 - 1.3.0
 
 ### Added
 - Per-rule marker tag `uuid-<valhalla_id>` on every POST and PUT, plus a
@@ -34,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on this version — otherwise the sync has no handle on them and will
   POST fresh copies.
 
-## 1.2.1 - 2026-10-13
+## 2026-10-13 - 1.2.1
 
 ### Changed
 - Per-rule overwrite opt-out is now driven by a list of rule names instead
@@ -48,7 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   existing trigger instances is ignored silently; no rules are preserved
   until operators populate `preserve_rule_names`.
 
-## 1.2.0 - 2026-10-13
+## 2026-10-13 - 1.2.0
 
 ### Added
 - `preserve_tag` sync-trigger argument (default `"nextron-valhalla-keep-custom"`,
@@ -72,7 +116,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   playbooks keep whatever thresholds they already saved — defaults only
   bite on brand-new trigger instances.
 
-## 1.1.2 - 2026-10-13
+## 2026-10-13 - 1.1.2
 
 ### Fixed
 - Disable-pass PUT now ships `alert_type_uuid`. Sekoia's GET returns the
@@ -82,7 +126,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `VA301 Field required`. The helper now extracts the uuid from the
   expanded object (or falls back to `DEFAULT_ALERT_UUID`) before PUT.
 
-## 1.1.1 - 2026-10-13
+## 2026-10-13 - 1.1.1
 
 ### Fixed
 - Disable-pass PUT body is built from a whitelist of writable fields
@@ -97,7 +141,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   details (`valhalla_id`, `sekoia_uuid`, body, error) so a repeated
   100% failure doesn't fail silently.
 
-## 1.1.0 - 2026-10-13
+## 2026-10-13 - 1.1.0
 
 ### Added
 - `SekoiaClient.get_rule(uuid)` helper.
@@ -140,7 +184,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   version are not re-enabled retroactively — 1.1.0 only stops clobbering
   going forward. Operators must re-enable such rules in the Sekoia UI.
 
-## 1.0.2 - 2026-09-14
+## 2026-09-14 - 1.0.2
 
 ### Changed
 - **Aligned dev workspace with source-of-truth

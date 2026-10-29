@@ -22,15 +22,27 @@
         "title": "Sekoia API base URL",
         "description": "Region-specific base URL. Default https://api.sekoia.io covers FRA1. For FRA2/MCO1/UAE1 use https://app.<region>.sekoia.io/api.",
         "default": "https://api.sekoia.io"
+      },
+      "community_uuid": {
+        "type": "string",
+        "title": "Sekoia community UUID",
+        "description": "Optional. The community the rules are synced into. Required when the API key has access to several communities (e.g. MSSP keys): the sync then only reads and writes rules of this community."
       }
     },
-    "required": ["sekoia_api_key"],
-    "secrets": ["valhalla_api_key", "sekoia_api_key"]
+    "required": [
+      "sekoia_api_key"
+    ],
+    "secrets": [
+      "valhalla_api_key",
+      "sekoia_api_key"
+    ]
   },
-  "description": "Nextron Valhalla Sigma Rules integration for Sekoia XDR",
+  "description": "Nextron Valhalla Sigma Rules integration for Sekoia",
   "name": "Nextron Valhalla Sigma Rules",
   "slug": "nextron-valhalla-sigma-rules",
-  "categories": ["Threat Intelligence"],
+  "categories": [
+    "Threat Intelligence"
+  ],
   "uuid": "ee90bd76-6805-4298-a25d-c8950f0209ec",
-  "version": "1.3.0"
+  "version": "1.4.0"
 }

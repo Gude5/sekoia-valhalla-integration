@@ -1,4 +1,4 @@
-from typing import Iterator, Optional
+from collections.abc import Iterator
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -8,47 +8,63 @@ from urllib3.util.retry import Retry
 class SekoiaAPIError(RuntimeError):
     """Raised when the Sekoia API returns a non-2xx response or an unexpected body."""
 
-    def __init__(self, message: str, status_code: Optional[int] = None):
+    def __init__(self, message: str, status_code: int | None = None):
         super().__init__(message)
         self.status_code = status_code
 
 
 class SekoiaRuleNotFoundError(SekoiaAPIError):
-    """Raised when Sekoia reports the target rule UUID as missing from its
-    catalog. Triggered by HTTP 404, or by HTTP 403 where the response body
-    carries Sekoia's ``code: "AU202"`` — the documented marker for "rule
-    existed but is gone". Any other 403 (plain permission problem, scope
-    mismatch, key rotated across workspaces) now surfaces as a generic
-    ``SekoiaAPIError`` instead of being mistaken for a deleted rule."""
+    """Raised when Sekoia answers HTTP 404 for a rule UUID. 403 is never
+    treated as "not found": the API documents it as "Insufficient
+    permissions", and misreading it would make the sync re-create rules."""
 
 
 LIST_PAGE_SIZE = 100
-MAX_LIST_PAGES = 10_000  # safety bound for deleting Sigma rules
+MAX_LIST_PAGES = 10_000  # safety bound against a server that ignores ``offset``
+
+RULES_PATH = "/v1/sic/conf/rules-catalog/rules"
+ALERT_TYPES_PATH = "/v1/sic/conf/alerts/types"
+INTHREAT_OBJECTS_PATH = "/v2/inthreat/objects"
+
+QueryParams = dict[str, str | int]
+
+
+def rule_tag_names(rule: dict) -> set[str]:
+    """Tag names of a catalog rule. Sekoia returns tags as
+    ``[{"uuid": ..., "name": ...}, …]``; plain strings are accepted too."""
+    names: set[str] = set()
+    for tag in rule.get("tags") or []:
+        if isinstance(tag, dict) and isinstance(tag.get("name"), str):
+            names.add(tag["name"])
+        elif isinstance(tag, str):
+            names.add(tag)
+    return names
 
 
 class SekoiaClient:
     def __init__(self, base_url: str, api_key: str, timeout: float = 30.0):
+        if not base_url.lower().startswith("https://"):
+            # The bearer token goes in every request header; never send it
+            # over plain HTTP.
+            raise ValueError(f"sekoia_base_url must use https:// (got {base_url!r})")
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
         self._timeout = timeout
         # One HTTP session across all requests — reuses the TCP + TLS
         # handshake for the ~thousands of rule PUTs a full sync makes.
-        # Without pooling the trigger opens a fresh connection per rule
-        # and Sekoia's edge intermittently connect-times-out under that
-        # rate of new inbound connections from a single source IP.
         self._session = requests.Session()
-        self._session.headers.update({
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        })
+        self._session.headers.update(
+            {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+        )
         # Retry only transient transport-layer errors (connect/read
         # timeouts, dropped connections) on idempotent methods. POST is
         # deliberately excluded: a read timeout after Sekoia already
         # created the rule would otherwise cause urllib3 to re-POST and
         # create a duplicate whose uuid we never see. HTTP 4xx/5xx
-        # responses are also NOT retried — the caller interprets
-        # 404/403-AU202 as "stale UUID, POST as new" and any other
-        # status should surface immediately.
+        # responses are not retried.
         retry = Retry(
             total=2,
             connect=2,
@@ -60,7 +76,6 @@ class SekoiaClient:
         )
         adapter = HTTPAdapter(max_retries=retry)
         self._session.mount("https://", adapter)
-        self._session.mount("http://", adapter)
 
     @staticmethod
     def _ensure_ok(resp: requests.Response, method: str, url: str) -> None:
@@ -73,80 +88,86 @@ class SekoiaClient:
         )
 
     @staticmethod
-    def _maybe_raise_not_found(
-        resp: requests.Response, method: str, url: str
-    ) -> None:
-        """Raise ``SekoiaRuleNotFoundError`` when the response unambiguously
-        means "the rule UUID is not in Sekoia's catalog".
-
-        That is HTTP 404, or HTTP 403 with Sekoia error code ``AU202``.
-        Other 403 responses (permission problem, workspace mismatch) are
-        left for ``_ensure_ok`` to raise as a generic ``SekoiaAPIError`` —
-        the trigger must not misread them as "stale uuid, re-POST".
-        """
+    def _maybe_raise_not_found(resp: requests.Response, method: str, url: str) -> None:
+        """Raise ``SekoiaRuleNotFoundError`` on HTTP 404 — the only status
+        the API documents as "unknown rule"."""
         if resp.status_code == 404:
             raise SekoiaRuleNotFoundError(
                 f"{method} {url} returned HTTP 404: {resp.text[:500]}",
                 status_code=404,
             )
-        if resp.status_code == 403:
-            try:
-                payload = resp.json()
-            except ValueError:
-                payload = None
-            code = payload.get("code") if isinstance(payload, dict) else None
-            if code == "AU202":
-                raise SekoiaRuleNotFoundError(
-                    f"{method} {url} returned HTTP 403 AU202: {resp.text[:500]}",
-                    status_code=403,
-                )
 
-    def create_rule(self, body: dict) -> str:
-        url = f"{self._base_url}/v1/sic/conf/rules-catalog/rules"
-        resp = self._session.post(url, json=body, timeout=self._timeout)
-        self._ensure_ok(resp, "POST", url)
-        try:
-            data = resp.json()
-        except ValueError as exc:
-            raise SekoiaAPIError(
-                f"POST {url} returned non-JSON body: {resp.text[:500]}"
-            ) from exc
-        sekoia_uuid = data.get("uuid") or data.get("id")
-        if not sekoia_uuid:
-            raise SekoiaAPIError(
-                f"POST {url} succeeded but response had no uuid/id field. "
-                f"Body: {resp.text[:500]}"
-            )
-        return sekoia_uuid
-
-    def get_rule(self, sekoia_uuid: str) -> dict:
-        """Fetch a rule's current server-side state.
-
-        Used by the sync trigger to read back the rule's current
-        ``enabled`` flag before PUTting an update, so a user who flipped
-        a rule off in the catalog isn't re-enabled on the next sync.
-        """
-        url = f"{self._base_url}/v1/sic/conf/rules-catalog/rules/{sekoia_uuid}"
-        resp = self._session.get(url, timeout=self._timeout)
-        self._maybe_raise_not_found(resp, "GET", url)
-        self._ensure_ok(resp, "GET", url)
+    @staticmethod
+    def _json(resp: requests.Response, method: str, url: str):
         try:
             return resp.json()
         except ValueError as exc:
-            raise SekoiaAPIError(
-                f"GET {url} returned non-JSON body: {resp.text[:500]}"
-            ) from exc
+            raise SekoiaAPIError(f"{method} {url} returned non-JSON body: {resp.text[:500]}") from exc
+
+    def _paginate(self, path: str, params: QueryParams, page_size: int) -> Iterator[dict]:
+        """Walk a ``{items, total}`` list endpoint with ``limit``/``offset``.
+
+        Any HTTP or shape error raises — callers that build state from the
+        listing (the sync's catalog scan) must never continue on a partial
+        result.
+        """
+        url = f"{self._base_url}{path}"
+        offset = 0
+        for _ in range(MAX_LIST_PAGES):
+            page_params: QueryParams = {**params, "limit": page_size, "offset": offset}
+            resp = self._session.get(url, params=page_params, timeout=self._timeout)
+            self._ensure_ok(resp, "GET", url)
+            data = self._json(resp, "GET", url)
+            if not isinstance(data, dict):
+                raise SekoiaAPIError(f"GET {url} returned unexpected list shape: {resp.text[:500]}")
+            items = data.get("items")
+            if items is None:
+                items = data.get("data") or []
+            if not isinstance(items, list):
+                raise SekoiaAPIError(f"GET {url} returned unexpected list shape: {resp.text[:500]}")
+            yield from items
+            offset += len(items)
+            total = data.get("total")
+            if not items or (isinstance(total, int) and offset >= total):
+                return
+        raise SekoiaAPIError(f"GET {url} did not terminate after {MAX_LIST_PAGES} pages ({offset} items fetched).")
+
+    def create_rule(self, body: dict) -> str:
+        url = f"{self._base_url}{RULES_PATH}"
+        resp = self._session.post(url, json=body, timeout=self._timeout)
+        self._ensure_ok(resp, "POST", url)
+        data = self._json(resp, "POST", url)
+        sekoia_uuid = data.get("uuid") if isinstance(data, dict) else None
+        if not sekoia_uuid:
+            raise SekoiaAPIError(f"POST {url} succeeded but response had no uuid field. Body: {resp.text[:500]}")
+        return sekoia_uuid
+
+    def get_rule(self, sekoia_uuid: str) -> dict:
+        """Fetch a rule's current server-side state."""
+        url = f"{self._base_url}{RULES_PATH}/{sekoia_uuid}"
+        resp = self._session.get(url, timeout=self._timeout)
+        self._maybe_raise_not_found(resp, "GET", url)
+        self._ensure_ok(resp, "GET", url)
+        return self._json(resp, "GET", url)
 
     def update_rule(self, sekoia_uuid: str, body: dict) -> None:
-        url = f"{self._base_url}/v1/sic/conf/rules-catalog/rules/{sekoia_uuid}"
+        url = f"{self._base_url}{RULES_PATH}/{sekoia_uuid}"
         resp = self._session.put(url, json=body, timeout=self._timeout)
+        self._maybe_raise_not_found(resp, "PUT", url)
+        self._ensure_ok(resp, "PUT", url)
+
+    def disable_rule(self, sekoia_uuid: str) -> None:
+        """Disable one rule through the dedicated endpoint, which flips only
+        ``enabled`` and leaves every other rule setting untouched."""
+        url = f"{self._base_url}{RULES_PATH}/{sekoia_uuid}/disabled"
+        resp = self._session.put(url, timeout=self._timeout)
         self._maybe_raise_not_found(resp, "PUT", url)
         self._ensure_ok(resp, "PUT", url)
 
     def delete_rule(self, sekoia_uuid: str) -> None:
         """DELETE a rule by uuid. 404 is treated as idempotent success (the
         rule was already gone in Sekoia)."""
-        url = f"{self._base_url}/v1/sic/conf/rules-catalog/rules/{sekoia_uuid}"
+        url = f"{self._base_url}{RULES_PATH}/{sekoia_uuid}"
         resp = self._session.delete(url, timeout=self._timeout)
         if resp.status_code == 404:
             return
@@ -154,52 +175,51 @@ class SekoiaClient:
 
     def iter_rules(
         self,
-        match_field: Optional[str] = None,
-        match_value: Optional[str] = None,
+        match_field: str | None = None,
+        match_value: str | None = None,
+        tag_name: str | None = None,
+        community_uuid: str | None = None,
         page_size: int = LIST_PAGE_SIZE,
     ) -> Iterator[dict]:
-        """Paginate ``GET /v1/sic/conf/rules-catalog/rules`` and yield
-        each rule dict. When ``match_field`` and ``match_value`` are set,
-        only rules whose top-level ``match_field`` equals ``match_value``
-        are yielded. Server-side filtering is attempted via
-        ``match[<field>]=<value>``; a client-side filter is applied as a
-        safety net so we never yield a rule that doesn't match.
+        """Paginate ``GET /v1/sic/conf/rules-catalog/rules`` and yield each
+        rule dict.
+
+        Filters are sent server-side (``match[tag_name]``,
+        ``match[community_uuid]``, ``match[<field>]``) and re-applied
+        client-side as a safety net, so a rule that doesn't match is never
+        yielded even if the server ignores a filter.
         """
-        url = f"{self._base_url}/v1/sic/conf/rules-catalog/rules"
-        offset = 0
-        for _ in range(MAX_LIST_PAGES):
-            params: dict[str, object] = {"limit": page_size, "offset": offset}
-            if match_field and match_value:
-                params[f"match[{match_field}]"] = match_value
-            resp = self._session.get(
-                url, params=params, timeout=self._timeout
-            )
-            self._ensure_ok(resp, "GET", url)
-            try:
-                data = resp.json()
-            except ValueError as exc:
-                raise SekoiaAPIError(
-                    f"GET {url} returned non-JSON body: {resp.text[:500]}"
-                ) from exc
+        params: QueryParams = {}
+        if tag_name:
+            params["match[tag_name]"] = tag_name
+        if community_uuid:
+            params["match[community_uuid]"] = community_uuid
+        if match_field and match_value:
+            params[f"match[{match_field}]"] = match_value
+        for item in self._paginate(RULES_PATH, params, page_size):
+            if tag_name and tag_name not in rule_tag_names(item):
+                continue
+            if community_uuid and item.get("community_uuid") != community_uuid:
+                continue
+            if match_field and match_value and item.get(match_field) != match_value:
+                continue
+            yield item
 
-            items = data.get("items") or data.get("data") or []
-            if not isinstance(items, list):
-                raise SekoiaAPIError(
-                    f"GET {url} returned unexpected list shape: {resp.text[:500]}"
-                )
-            if not items:
-                return
+    def list_alert_types(self, page_size: int = LIST_PAGE_SIZE) -> list[dict]:
+        """All alert types visible to the key (``GET /v1/sic/conf/alerts/types``)."""
+        return list(self._paginate(ALERT_TYPES_PATH, {}, page_size))
 
-            for item in items:
-                if match_field and match_value and item.get(match_field) != match_value:
-                    # Server-side filter didn't apply (unknown query param);
-                    # fall back to client-side filtering.
-                    continue
-                yield item
-
-            offset += len(items)
-
-        raise SekoiaAPIError(
-            f"GET {url} did not terminate after {MAX_LIST_PAGES} pages "
-            f"({offset} rules fetched)."
-        )
+    def find_attack_pattern(self, external_id: str) -> str | None:
+        """Return the STIX id (``attack-pattern--…``) of the ATT&CK technique
+        with this external id (e.g. ``T1059``), or ``None`` if unknown."""
+        url = f"{self._base_url}{INTHREAT_OBJECTS_PATH}"
+        params: QueryParams = {"match[external_id]": external_id, "limit": 10}
+        resp = self._session.get(url, params=params, timeout=self._timeout)
+        self._ensure_ok(resp, "GET", url)
+        data = self._json(resp, "GET", url)
+        items = data.get("items") if isinstance(data, dict) else None
+        for item in items or []:
+            stix_id = item.get("id") if isinstance(item, dict) else None
+            if isinstance(stix_id, str) and stix_id.startswith("attack-pattern--"):
+                return stix_id
+        return None

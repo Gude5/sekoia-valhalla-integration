@@ -95,9 +95,7 @@ def test_tag_mode_zero_matches_logs_tag_histogram(trigger):
 
 
 def test_tag_mode_accepts_plain_string_tags(trigger):
-    trigger._sekoia.iter_rules.return_value = iter(
-        [{"uuid": "sk-1", "tags": [MARKER_TAG, "attack.t1059"]}]
-    )
+    trigger._sekoia.iter_rules.return_value = iter([{"uuid": "sk-1", "tags": [MARKER_TAG, "attack.t1059"]}])
 
     trigger._delete_once()
 
@@ -112,15 +110,11 @@ def test_tag_mode_accepts_plain_string_tags(trigger):
 def test_field_mode_used_when_marker_tag_empty(trigger):
     trigger._marker_tag = ""
     trigger._match_value = API_KEY_UUID
-    trigger._sekoia.iter_rules.return_value = iter(
-        [{"uuid": "sk-1", "created_by": API_KEY_UUID}]
-    )
+    trigger._sekoia.iter_rules.return_value = iter([{"uuid": "sk-1", "created_by": API_KEY_UUID}])
 
     trigger._delete_once()
 
-    trigger._sekoia.iter_rules.assert_called_once_with(
-        match_field=DEFAULT_MATCH_FIELD, match_value=API_KEY_UUID
-    )
+    trigger._sekoia.iter_rules.assert_called_once_with(match_field=DEFAULT_MATCH_FIELD, match_value=API_KEY_UUID)
     assert trigger._sekoia.delete_rule.call_count == 1
     event = trigger.send_event.call_args.kwargs["event"]
     assert event["marker_tag"] == ""

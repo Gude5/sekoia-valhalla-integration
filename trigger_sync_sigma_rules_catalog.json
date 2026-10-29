@@ -1,7 +1,7 @@
 {
   "uuid": "349e50ff-f44f-420d-a09e-7567997ddd62",
   "name": "Sync Valhalla Sigma rules into Sekoia Rules Catalog",
-  "description": "Periodically pulls the Valhalla Sigma feed and POSTs each rule to the Sekoia Rules Catalog so it executes in the detection engine. POST on first seen, PUT on subsequent pulls. The server's current `enabled` flag is re-sent on PUT so a rule the user disabled in the catalog stays disabled across syncs.",
+  "description": "Periodically pulls the Valhalla Sigma feed and pushes each rule into the Sekoia Rules Catalog so it runs in the detection engine. New rules are created, known rules are updated in place, and a rule the user has disabled in the catalog stays disabled across syncs.",
   "docker_parameters": "sync-sigma-rules-catalog",
   "arguments": {
     "type": "object",
@@ -15,36 +15,58 @@
       "enabled": {
         "type": "boolean",
         "title": "Enable rules on push",
-        "description": "When false (default), newly-created rules land in the catalog disabled — users opt in per rule. Only applied on initial POST; existing rules preserve whatever the user chose in the catalog.",
+        "description": "If false (default), newly-imported rules are disabled on first import. Existing rules keep their current catalog state.",
         "default": false
       },
       "min_sigma_level": {
         "type": "string",
         "title": "Minimum Sigma level",
         "description": "Only rules with a Sigma `level` at least this severe are imported. Rules missing the `level` field are always skipped.",
-        "enum": ["informational", "low", "medium", "high", "critical"],
-        "enumNames": ["informational", "low", "medium", "high", "critical"],
+        "enum": [
+          "informational",
+          "low",
+          "medium",
+          "high",
+          "critical"
+        ],
+        "enumNames": [
+          "informational",
+          "low",
+          "medium",
+          "high",
+          "critical"
+        ],
         "default": "medium"
       },
       "min_sigma_status": {
         "type": "string",
         "title": "Minimum Sigma status",
         "description": "Only rules with a Sigma `status` at least this mature are imported (ordering: experimental < test < stable). Rules with status `deprecated` or `unsupported` are never imported. Rules missing the `status` field are always skipped.",
-        "enum": ["experimental", "test", "stable"],
-        "enumNames": ["experimental", "test", "stable"],
+        "enum": [
+          "experimental",
+          "test",
+          "stable"
+        ],
+        "enumNames": [
+          "experimental",
+          "test",
+          "stable"
+        ],
         "default": "stable"
       },
       "disable_removed": {
         "type": "boolean",
         "title": "Disable rules removed from the Valhalla feed",
-        "description": "When Nextron removes a rule from the Valhalla feed (deprecated, superseded, withdrawn) — or when a rule newly drops below your configured minimum level/status — the sync disables it in the Sekoia catalog by setting enabled=false. The rule is NOT deleted: it stays in the catalog so you can inspect it, and if Nextron re-publishes it later the sync resumes updating in place. Default false — dry-run that only counts how many rules WOULD be disabled (see the `to_disable` field on the summary event). Set to true to actually disable.",
+        "description": "Disables rules that Nextron removed from the Valhalla feed, or that newly fell below your minimum level/status. The rule stays in the catalog (not deleted); if Nextron re-publishes it later, the sync resumes updating it. Default false runs a dry-run — candidates are counted under `to_disable` on the summary event. Set true to actually disable. The pass is skipped when the feed is empty or shrank by more than 20% (see `disable_skipped_reason`). Enable it on only one trigger per community.",
         "default": false
       },
       "preserve_rule_names": {
         "type": "array",
         "title": "Preserve rule names (per-rule opt-out)",
-        "description": "Rules whose exact name appears in this list are NOT overwritten with Valhalla's content on subsequent syncs. Use it to protect hand-tuned rules: copy the rule's name from the Sekoia Rules Catalog UI into this list, and future syncs will skip the PUT for that rule (counted under `preserved` on the summary event). Match is exact and case-sensitive; surrounding whitespace is tolerated. Leave empty (default) to disable the per-rule check. The `disable_removed` pass still runs on preserved rules — it only flips `enabled` and keeps hand-edited content intact. Use the Form input mode; the Variable mode is not needed for this argument. If you want to delete entries from this list, we recommend creating a new trigger configuration.",
-        "items": { "type": "string" },
+        "description": "Rules matching an entry of this list are not overwritten by future syncs — counted under `preserved` on the summary event. An entry matches the rule's name as shown in the Sekoia Rules Catalog, or one of its tags (e.g. `uuid-<valhalla_id>`, which is unique). Match is case-sensitive; surrounding whitespace is tolerated. Leave empty (default) to disable. Any customisation of a synced rule that is not listed here is overwritten on the next sync. The `disable_removed` pass still runs on preserved rules — only the content is protected. Use the Form input mode. To delete entries from this list, create a new trigger configuration.",
+        "items": {
+          "type": "string"
+        },
         "default": []
       }
     },
@@ -53,22 +75,57 @@
   "results": {
     "type": "object",
     "properties": {
-      "created": { "type": "integer" },
-      "updated": { "type": "integer" },
-      "preserved": { "type": "integer" },
-      "failed": { "type": "integer" },
-      "skipped_unmapped": { "type": "integer" },
-      "skipped_filter": { "type": "integer" },
-      "total_rules": { "type": "integer" },
-      "top_unmapped": { "type": "object" },
-      "server_marker_count": { "type": "integer" },
-      "duplicate_markers": { "type": "integer" },
-      "local_overridden": { "type": "integer" },
-      "to_disable": { "type": "integer" },
-      "newly_disabled": { "type": "integer" },
-      "already_disabled": { "type": "integer" },
-      "already_gone": { "type": "integer" },
-      "disable_failed": { "type": "integer" }
+      "created": {
+        "type": "integer"
+      },
+      "updated": {
+        "type": "integer"
+      },
+      "preserved": {
+        "type": "integer"
+      },
+      "failed": {
+        "type": "integer"
+      },
+      "skipped_unmapped": {
+        "type": "integer"
+      },
+      "skipped_filter": {
+        "type": "integer"
+      },
+      "total_rules": {
+        "type": "integer"
+      },
+      "top_unmapped": {
+        "type": "object"
+      },
+      "server_marker_count": {
+        "type": "integer"
+      },
+      "duplicate_markers": {
+        "type": "integer"
+      },
+      "local_overridden": {
+        "type": "integer"
+      },
+      "to_disable": {
+        "type": "integer"
+      },
+      "newly_disabled": {
+        "type": "integer"
+      },
+      "already_disabled": {
+        "type": "integer"
+      },
+      "already_gone": {
+        "type": "integer"
+      },
+      "disable_failed": {
+        "type": "integer"
+      },
+      "disable_skipped_reason": {
+        "type": "string"
+      }
     }
   }
 }

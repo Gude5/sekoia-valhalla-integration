@@ -1,6 +1,6 @@
 import json
 from collections import Counter
-from typing import Iterable
+from collections.abc import Iterable
 
 from sekoia_automation.trigger import Trigger
 
@@ -79,40 +79,28 @@ class DeleteCatalogRules(Trigger):
             if self._marker_tag:
                 matches, filter_desc = self._collect_by_tag(self._marker_tag)
             elif self._match_value:
-                matches, filter_desc = self._collect_by_field(
-                    self._match_field, self._match_value
-                )
+                matches, filter_desc = self._collect_by_field(self._match_field, self._match_value)
             else:
                 self._log_diagnostic_no_filter()
                 return
 
             self._process_matches(matches, filter_desc)
         except Exception as exc:
-            self.log_exception(
-                exc, message="Failed to delete Valhalla-imported Rules Catalog rules"
-            )
+            self.log_exception(exc, message="Failed to delete Valhalla-imported Rules Catalog rules")
 
     def _collect_by_tag(self, tag: str) -> tuple[list[dict], str]:
-        matches = [
-            r
-            for r in self._sekoia.iter_rules()
-            if r.get("uuid") and _rule_has_tag(r, tag)
-        ]
+        matches = [r for r in self._sekoia.iter_rules() if r.get("uuid") and _rule_has_tag(r, tag)]
         return matches, f"tag={tag!r}"
 
     def _collect_by_field(self, field: str, value: str) -> tuple[list[dict], str]:
-        matches = [
-            r
-            for r in self._sekoia.iter_rules(match_field=field, match_value=value)
-            if r.get("uuid")
-        ]
+        matches = [r for r in self._sekoia.iter_rules(match_field=field, match_value=value) if r.get("uuid")]
         return matches, f"{field}={value!r}"
 
     def _process_matches(self, matches: list[dict], filter_desc: str) -> None:
         total = len(matches)
 
         if total == 0:
-            self._log_zero_matches(filter_desc)
+            self._log_zero_matches()
             return
 
         if not self._confirm:
@@ -150,8 +138,7 @@ class DeleteCatalogRules(Trigger):
                 )
 
         self.log(
-            f"Delete summary: deleted={deleted} failed={len(failed_uuids)} "
-            f"total_matched={total} filter={filter_desc}",
+            f"Delete summary: deleted={deleted} failed={len(failed_uuids)} total_matched={total} filter={filter_desc}",
             level="info",
         )
         self.send_event(
@@ -185,7 +172,7 @@ class DeleteCatalogRules(Trigger):
             "remaining": remaining,
         }
 
-    def _log_zero_matches(self, filter_desc: str) -> None:
+    def _log_zero_matches(self) -> None:
         """Log a histogram of the field or tag values seen so the operator
         can figure out what to configure."""
         event: dict = {
@@ -223,12 +210,8 @@ class DeleteCatalogRules(Trigger):
                 f"via the trigger's `match_value` config.",
                 level="info",
             )
-            event[f"observed_{self._match_field}"] = dict(
-                field_histogram.most_common(10)
-            )
-        self.send_event(
-            event_name="valhalla-sigma-catalog-delete", event=event
-        )
+            event[f"observed_{self._match_field}"] = dict(field_histogram.most_common(10))
+        self.send_event(event_name="valhalla-sigma-catalog-delete", event=event)
 
     def _log_diagnostic_no_filter(self) -> None:
         """Emitted when both ``marker_tag`` and ``match_value`` are empty."""
@@ -273,9 +256,7 @@ class DeleteCatalogRules(Trigger):
             self.log(f"Diagnostic peek failed: {exc}", level="warning")
 
         if first_rule is not None:
-            preview = json.dumps(first_rule, default=str)[
-                :DIAGNOSTIC_RULE_DUMP_CHARS
-            ]
+            preview = json.dumps(first_rule, default=str)[:DIAGNOSTIC_RULE_DUMP_CHARS]
             self.log(
                 f"Diagnostic — sample rule keys: {sorted(first_rule.keys())}. "
                 f"First rule (truncated to {DIAGNOSTIC_RULE_DUMP_CHARS} chars): "
