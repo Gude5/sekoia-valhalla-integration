@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   key descriptions say they are masked once the account is saved.
 - JSON files formatted like the automation-library JSON linter expects.
 
+### Fixed
+- Import build: exclude `aiocsv 1.4.2` (transitive via the SDK), which was
+  published as source only and can't be built in Sekoia's compiler-less
+  build image.
+
 ### Removed
 - `"format": "password"` on the API key fields: Sekoia's account form doesn't
   use it (the 1.2.0 entry claiming masked input was wrong).

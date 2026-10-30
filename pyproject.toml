@@ -9,6 +9,10 @@ dependencies = [
     "sekoia-automation-sdk>=1.27.0,<2",
     "requests>=2.34.2,<3",
     "PyYAML>=6.0,<7",
+    # Transitive (via sekoia-automation-sdk). Sekoia's custom-integration
+    # import resolves without our lockfile on python:3.12-slim, which has no
+    # C compiler; aiocsv 1.4.2 was published as source only (2026-10-30).
+    "aiocsv!=1.4.2",
 ]
 
 [dependency-groups]
