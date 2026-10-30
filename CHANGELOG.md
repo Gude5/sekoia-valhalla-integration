@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-10-30 - 1.4.1
+
+### Changed
+- The `community_uuid` description explains where to find the UUID; the API
+  key descriptions say they are masked once the account is saved.
+- JSON files formatted like the automation-library JSON linter expects.
+
+### Removed
+- `"format": "password"` on the API key fields: Sekoia's account form doesn't
+  use it (the 1.2.0 entry claiming masked input was wrong).
+
 ## 2026-10-29 - 1.4.0
 
 ### Added

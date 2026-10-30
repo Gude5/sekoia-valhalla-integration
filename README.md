@@ -61,10 +61,10 @@ To roll back, enable the **Delete all Valhalla-imported rules from the Sekoia Ru
 
 | Field | Secret | Description |
 |---|---|---|
-| `valhalla_api_key` | yes | Valhalla API key. Defaults to the public demo key. |
-| `sekoia_api_key` | yes | Sekoia bearer token. Required by both triggers. |
+| `valhalla_api_key` | yes | Valhalla API key. Defaults to the public demo key. Masked once the account is saved. |
+| `sekoia_api_key` | yes | Sekoia bearer token. Masked once the account is saved. Required by both triggers. |
 | `sekoia_base_url` | no | Sekoia API base URL (must be `https://`). Defaults to `https://api.sekoia.io` (FRA1). |
-| `community_uuid` | no | Community to sync into. Required when the key sees several communities (MSSP): the sync then only reads and writes rules of this community. Without it, the sync aborts if imported rules exist in more than one community. |
+| `community_uuid` | no | Community to sync into. Only needed when the key sees several communities (MSSP): the sync then only reads and writes rules of this community. Without it, the sync aborts if imported rules exist in more than one community. To find the UUID, open the community in Sekoia, go to **Settings → General** and copy the part of the URL between `/communities/` and `/community-details`. |
 
 The Valhalla API URL is hardcoded to `https://valhalla.nextron-systems.com`.
 
