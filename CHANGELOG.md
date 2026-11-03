@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-11-03 - 1.5.0
+
+### Added
+- Rules switched off by the disable pass are re-enabled once they are back
+  in the feed and meet the thresholds (`PUT /rules/{uuid}/enabled`). Only
+  rules the integration disabled itself are tracked; rules disabled by the
+  user are never touched. New summary fields `re_enabled` and
+  `reenable_failed`.
+- Tests for the disable-pass error paths (404, other errors, stop during
+  the pass) and for re-enabling.
+
+### Changed
+- ATT&CK lookups use `GET /v2/inthreat/objects/light` with
+  `match[type]=attack-pattern`, which also works with *View intelligence
+  with limited access*.
+- The catalog scan no longer sends `match[community_uuid]` (not a filter of
+  the list endpoint); the community is filtered client-side.
+- README: *Manage rule settings* removed from the required permissions;
+  `logsource` documented as informational; removing the `nextron-valhalla`
+  tag makes the sync re-create the rule.
+
 ## 2026-10-30 - 1.4.1
 
 ### Changed
