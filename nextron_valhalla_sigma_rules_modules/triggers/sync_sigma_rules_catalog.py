@@ -361,9 +361,9 @@ class SyncSigmaRulesCatalog(Trigger):
         (server-side ``match[tag_name]`` filter), optionally restricted to
         the configured community. For rules that also carry a
         ``uuid-<valhalla_id>`` tag the mapping is merged into the local
-        id-map, so a fresh trigger instance (new playbook, recreated
-        trigger, wiped data volume) picks up existing rules instead of
-        creating duplicates.
+        id-map, so a trigger with empty local storage (new trigger
+        configuration, wiped data volume) picks up existing rules instead
+        of creating duplicates.
 
         When several rules carry the same ``uuid-*`` tag (e.g. a user
         duplicated an imported rule to tune it), the UUID already in the
