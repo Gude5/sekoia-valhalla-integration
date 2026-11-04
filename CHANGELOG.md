@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-11-04 - 1.5.1
+
+### Fixed
+- A feed rule with unexpected field types (e.g. a numeric `title`, a null
+  `content`, a string `tags`) no longer aborts the whole sync. It is skipped
+  as `<malformed>` in `top_unmapped` and kept out of the disable and
+  re-enable passes.
+- A known rule missing from the catalog scan is looked up with
+  `GET /rules/{uuid}` before it is re-created. Only a 404 re-creates it
+  (a 403 or other error counts as `failed`), so a scan gap no longer
+  duplicates rules. A rule whose `nextron-valhalla` tag was removed is now
+  updated (and re-tagged) instead of duplicated. Rules listed twice by the
+  scan are no longer reported as duplicate markers.
+- Invalid trigger arguments, missing alert types and a non-`https://` base
+  URL raise the SDK's configuration errors, so the trigger no longer
+  restarts in a tight loop.
+
+### Changed
+- The Valhalla fetch retries transient errors (timeouts, HTTP 429/5xx), and
+  a failed sync is retried after 15 and then 30 minutes instead of
+  waiting a full `frequency`. At most 2 such early retries run per 24 hours.
+
 ## 2026-11-03 - 1.5.0
 
 ### Added
