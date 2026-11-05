@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-11-05 - 1.6.0
+
+### Added
+- The disable pass tags the rules it switches off with
+  `valhalla-auto-disabled`. Any trigger configuration re-enables tagged
+  rules once they are back in the feed and removes the tag; rules disabled
+  by the user (no tag) are never touched. A tag left on a rule the user
+  re-enabled is removed.
+- `reenable_conflicts`: rules this configuration re-enabled in its previous
+  sync that another trigger disabled again, with a warning.
+- `stale`: imported rules kept at their catalog version because the new
+  version couldn't be converted; up to five names are logged.
+
+### Changed
+- Updates keep the settings made in Sekoia (entities, assets, parameters,
+  event fields, similarity strategy, validity, goal, data sources) and the
+  threats linked by the user. ATT&CK links are kept as well when the key
+  can't look them up. A tenant test showed that `PUT` replaces the whole
+  rule, so these were reset before.
+- The disable sends the catalog rule back with `enabled` off and the tag
+  (tenant-tested: nothing else changes) instead of calling the dedicated
+  disable endpoint. Re-enabling happens in the regular update.
+- `preserve_rule_names` is a text field (one entry per line, or separated
+  by `;`), so entries can be removed without a new trigger configuration.
+
+### Removed
+- The per-configuration record of auto-disabled rules (`auto_disabled` in
+  the feed-state file) and `SekoiaClient.enable_rule` / `disable_rule`.
+
+## 2026-11-05 - 1.5.2
+
+### Changed
+- `min_sigma_status` defaults to `experimental` instead of `stable`.
+  Nextron assigns statuses conservatively, so `stable` imported only a
+  small share of the feed; new rules are still imported disabled. Trigger
+  configurations that already store a value keep it.
+
 ## 2026-11-04 - 1.5.1
 
 ### Fixed

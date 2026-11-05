@@ -1,0 +1,66 @@
+{
+  "alert_category": {
+    "name": "intrusions",
+    "uuid": "442932c7-8c42-4fab-82eb-2ff54e7def5d"
+  },
+  "alert_type": {
+    "category_name": "intrusions",
+    "category_uuid": "442932c7-8c42-4fab-82eb-2ff54e7def5d",
+    "description": null,
+    "detail": "Ecsirt-taxonomy",
+    "uuid": "599f4b1a-dd60-43fe-8ee9-07d3c5d00ded",
+    "value": "application-compromise"
+  },
+  "all_assets": true,
+  "all_entities": true,
+  "assets": [],
+  "available_for_subcommunities": false,
+  "community_uuid": "4039e5c6-f05e-4854-8da9-ab049e99ab16",
+  "created_at": "2026-11-05T11:04:55.508130Z",
+  "created_by": "aeff3507-67cd-49f9-99ae-4f113630be37",
+  "created_by_type": "apikey",
+  "datasources": [],
+  "deprecation_message": null,
+  "description": "Temporary rule created by the Valhalla integration PUT test. Safe to delete.",
+  "effort": 2,
+  "enabled": false,
+  "entities": [],
+  "event_fields": [],
+  "exclude_assets": false,
+  "exclude_entities": false,
+  "false_positives": null,
+  "format_uuid": null,
+  "goal": null,
+  "instance_uuid": "263dcf4b-77a5-4830-aa1e-b505af9a1cf5",
+  "is_private": null,
+  "last_compilation_at": null,
+  "last_compilation_message": null,
+  "last_compilation_success": null,
+  "lifecycle": null,
+  "name": "zz-valhalla-puttest",
+  "parameters": null,
+  "payload": "logsource:\n  product: windows\n  category: process_creation\ndetection:\n  selection:\n    process.command_line|contains: zz-valhalla-puttest\n  condition: selection\n",
+  "private": true,
+  "references": null,
+  "related_object_refs": [],
+  "severity": 52,
+  "similarity_strategy": null,
+  "source": null,
+  "tags": [
+    {
+      "name": "zz-auto-disabled",
+      "uuid": "0f54f7ef-03be-4035-8207-4add67969380"
+    },
+    {
+      "name": "zz-puttest",
+      "uuid": "f2b9ae6a-3852-4249-bba9-11d48d3bc1c7"
+    }
+  ],
+  "type": "sigma",
+  "updated_at": "2026-11-05T11:06:57.156323Z",
+  "updated_by": "aeff3507-67cd-49f9-99ae-4f113630be37",
+  "updated_by_type": "apikey",
+  "uuid": "dc9ead35-7a91-4d35-b882-6c9e90e511ad",
+  "valid_until": null,
+  "verified": false
+}
