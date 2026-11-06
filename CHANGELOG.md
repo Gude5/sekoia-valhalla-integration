@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-11-06 - 1.7.0
+
+### Added
+- `unchanged`: rules whose update would change nothing are no longer sent
+  to Sekoia (one PUT per changed rule instead of one per known rule).
+- `skipped_no_id`: feed rules without a Valhalla `id`.
+
+### Changed
+- `effort` and `deprecation_message` are kept on update like the other
+  settings made in Sekoia; the alert type stays generated from the tags.
+- Disabling, re-enabling as-is and removing a stale marker re-read the
+  rule right before sending it back, so a change saved since the scan is
+  kept.
+- Rules imported into several communities without `community_uuid` raise
+  a module configuration error that `run()` passes on to the SDK instead
+  of retrying.
+- The API keys are marked secret in the configuration model.
+
+### Fixed
+- The disable pass looks up a rule missing from the scan (e.g. without the
+  `nextron-valhalla` tag) before writing it off. It used to drop the
+  mapping without disabling the rule, so the rule stayed enabled and a
+  duplicate was created when it came back.
+
+## 2026-11-05 - 1.6.1
+
+### Fixed
+- Updates, disables and re-enables send `entities`, `assets` and
+  `datasources` as UUIDs. GET returns them as objects, which `PUT` rejects,
+  so a rule restricted to entities or with data sources could not be
+  updated, disabled or re-enabled.
+
 ## 2026-11-05 - 1.6.0
 
 ### Added
