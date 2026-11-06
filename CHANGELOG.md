@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-11-06 - 1.7.1
+
+### Fixed
+- A failed ATT&CK lookup (other than 401/403) is no longer cached for the
+  life of the trigger. It is retried on the next sync, and until then the
+  rule keeps the ATT&CK links it has. Before, one transient error removed
+  the link and it stayed removed until the trigger restarted.
+
 ## 2026-11-06 - 1.7.0
 
 ### Added
